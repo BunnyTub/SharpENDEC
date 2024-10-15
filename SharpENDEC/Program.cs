@@ -1532,7 +1532,7 @@ namespace SharpENDEC
     internal static class Program
     {
         public const int ReleaseVersion = 1;
-        public const int MinorVersion = 0;
+        public const int MinorVersion = 1;
         public const bool IsCuttingEdge = true;
         public static string FriendlyVersion = string.Empty;
 
