@@ -1449,29 +1449,36 @@ namespace SharpENDEC
 
         public static void KeyboardProcessor()
         {
-            while (true)
+            try
             {
-                try
+                while (true)
                 {
-                    switch (Console.ReadKey(true).Key)
+                    try
                     {
-                        case ConsoleKey.D0:
-                            Console.WriteLine("What do you want me to do? Divide by zero?");
-                            break;
-                        case ConsoleKey.Delete:
-                            ClearFolder(FileHistoryDirectory);
-                            Console.WriteLine("Cleared history folder.");
-                            break;
-                        case ConsoleKey.G:
-                            Console.WriteLine("GUI shown.");
-                            break;
+                        switch (Console.ReadKey(true).Key)
+                        {
+                            case ConsoleKey.D0:
+                                Console.WriteLine("What do you want me to do? Divide by zero?");
+                                break;
+                            case ConsoleKey.Delete:
+                                ClearFolder(FileHistoryDirectory);
+                                Console.WriteLine("Cleared history folder.");
+                                break;
+                            case ConsoleKey.G:
+                                Console.WriteLine("GUI shown.");
+                                break;
+                        }
                     }
-                }
-                catch (Exception)
-                {
+                    catch (Exception)
+                    {
 
+                    }
+                    Thread.Sleep(250);
                 }
-                Thread.Sleep(250);
+            }
+            catch (ThreadAbortException)
+            {
+                Console.WriteLine("Keyboard Processor was stopped.");
             }
         }
 
@@ -1481,16 +1488,36 @@ namespace SharpENDEC
             {
                 string ProgramVersion = Program.FriendlyVersion;
                 Init(ProgramVersion, false);
+
+                void RestartThread(ref Thread serviceThread, ThreadStart method)
+                {
+                    if (serviceThread.ThreadState != ThreadState.Stopped && serviceThread.ThreadState != ThreadState.Unstarted)
+                        serviceThread.Abort();
+
+                    serviceThread = new Thread(method);
+                    serviceThread.Start();
+                }
+
+                void ShutdownCapture()
+                {
+                    capture.ShutdownCapture = true;
+                    Console.WriteLine("Waiting for CAP to shutdown.");
+                    while (capture.ShutdownCapture)
+                    {
+                        Thread.Sleep(500);
+                    }
+                    Console.WriteLine("CAP has been stopped.");
+                }
+
                 while (true)
                 {
                     Config();
                     Check.LastHeartbeat = DateTime.Now;
-                    Program.CAPService = MethodToThread(CAP);
-                    Program.CAPService.Start();
-                    Program.RelayService = MethodToThread(Relay);
-                    Program.RelayService.Start();
-                    Program.KeyboardProc = MethodToThread(KeyboardProcessor);
-                    Program.KeyboardProc.Start();
+
+                    RestartThread(ref Program.CAPService, CAP);
+                    RestartThread(ref Program.RelayService, Relay);
+                    RestartThread(ref Program.KeyboardProc, KeyboardProcessor);
+
                     while (true)
                     {
                         if ((DateTime.Now - Check.LastHeartbeat).TotalMinutes >= 5)
@@ -1501,14 +1528,10 @@ namespace SharpENDEC
 
                                 try
                                 {
-                                    Program.CAPService.Abort();
-                                    Program.RelayService.Abort();
-                                    capture.ShutdownCapture = true;
-
-                                    while (capture.ShutdownCapture)
-                                    {
-                                        Thread.Sleep(500);
-                                    }
+                                    ShutdownCapture();
+                                    RestartThread(ref Program.CAPService, CAP);
+                                    RestartThread(ref Program.RelayService, Relay);
+                                    RestartThread(ref Program.KeyboardProc, KeyboardProcessor);
 
                                     Init(ProgramVersion, true);
                                     Thread.Sleep(5000);
@@ -1533,28 +1556,17 @@ namespace SharpENDEC
     {
         public const int ReleaseVersion = 1;
         public const int MinorVersion = 1;
-        public const bool IsCuttingEdge = true;
+        public const bool IsCuttingEdge = false;
         public static string FriendlyVersion = string.Empty;
 
-        private static readonly Thread WatchdogService = ENDEC.Watchdog();
+        internal static Thread WatchdogService;
         internal static Thread CAPService;
         internal static Thread RelayService;
         internal static Thread KeyboardProc;
         internal static Thread BatteryProc;
 
         [STAThread]
-        static void Main()
-        {
-            Console.CancelKeyPress += CancelAllOperations;
-            SetVersion();
-            //if (IsCuttingEdge) Console.WriteLine("You are running on SharpENDEC Cutting Edge, which may be unstable.");
-            // PLUGIN IMPLEMENTATION!!!
-            // BATTERY IMPLEMENTATION!!!
-            // GUI IMPLEMENTATION!!!
-            WatchdogService.Start();
-        }
-
-        private static void SetVersion()
+        private static void Main()
         {
             if (!IsCuttingEdge)
             {
@@ -1562,8 +1574,14 @@ namespace SharpENDEC
             }
             else
             {
-                FriendlyVersion = $"SharpENDEC {ReleaseVersion}.{MinorVersion} | Cutting Edge (unstable)";
+                FriendlyVersion = $"SharpENDEC {ReleaseVersion}.{MinorVersion}-c | Cutting Edge (unstable)";
             }
+            // PLUGIN IMPLEMENTATION!!!
+            // BATTERY IMPLEMENTATION!!!
+            // GUI IMPLEMENTATION!!!
+            WatchdogService = ENDEC.Watchdog();
+            WatchdogService.Start();
+            Console.CancelKeyPress += CancelAllOperations;
         }
 
         private static void CancelAllOperations(object sender, ConsoleCancelEventArgs e)
