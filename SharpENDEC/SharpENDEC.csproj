@@ -241,6 +241,7 @@
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="VersionInfo.cs" />
+    <Compile Include="VersionInfoTemplate.cs" />
     <EmbeddedResource Include="Unused\AlertForm.resx">
       <DependentUpon>AlertForm.cs</DependentUpon>
     </EmbeddedResource>
@@ -273,6 +274,7 @@
       <DependentUpon>Settings.settings</DependentUpon>
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
     </Compile>
+    <None Include="UpdateVersionInfo.ps1" />
     <None Include="webserver.py" />
   </ItemGroup>
   <ItemGroup>
@@ -320,6 +322,7 @@ del "$(TargetDir)System.Diagnostics.DiagnosticSource.xml"
 </PostBuildEvent>
   </PropertyGroup>
   <PropertyGroup>
-    <PreBuildEvent>echo</PreBuildEvent>
+    <PreBuildEvent>cd $(ProjectDir)
+powershell -ExecutionPolicy Bypass -File "$(ProjectDir)\UpdateVersionInfo.ps1"</PreBuildEvent>
   </PropertyGroup>
 </Project>

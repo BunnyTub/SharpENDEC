@@ -11,13 +11,14 @@ using System.Linq;
 using System.Net.Http;
 using System.Net.Sockets;
 using System.Reflection;
+using System.Security.Principal;
 using System.Speech.Synthesis;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using System.Xml.Linq;
+using static SharpENDEC.VersionInfo;
 
 namespace SharpENDEC
 {
@@ -355,7 +356,7 @@ namespace SharpENDEC
                         }
                         catch (Exception ex)
                         {
-                            ColorLine($"[Relayer] {ex.Message}", ConsoleColor.Red);
+                            ColorLine($"[File Processor] {ex.Message}", ConsoleColor.Red);
                             return false;
                         }
                     }
@@ -428,13 +429,13 @@ namespace SharpENDEC
                         }
                     }
                 }
-                ColorLine($"[Heartbeat] {SVDictionary.FilesIgnoredDueToMatchingPairs(Settings.Default.CurrentLanguage, FilesMatched)}", ConsoleColor.Blue);
+                if (FilesMatched != 0) ColorLine($"[Heartbeat] {SVDictionary.FilesIgnoredDueToMatchingPairs(Settings.Default.CurrentLanguage, FilesMatched)}", ConsoleColor.Blue);
                 LastHeartbeat = DateTime.Now;
             }
 
             public static string WatchNotify()
             {
-                Console.WriteLine($"[Relayer] {SVDictionary.WatchingFiles(Settings.Default.CurrentLanguage)}");
+                Console.WriteLine($"[File Processor] {SVDictionary.WatchingFiles(Settings.Default.CurrentLanguage)}");
 
                 while (true)
                 {
@@ -446,7 +447,7 @@ namespace SharpENDEC
                         string fileName = Path.GetFileName(file);
                         if (File.Exists(Path.Combine(FileHistoryDirectory, fileName)))
                         {
-                            ColorLine($"[Relayer] {SVDictionary.FileIgnoredDueToMatchingPair(Settings.Default.CurrentLanguage)}", ConsoleColor.Blue);
+                            ColorLine($"[File Processor] {SVDictionary.FileIgnoredDueToMatchingPair(Settings.Default.CurrentLanguage)}", ConsoleColor.Blue);
                             File.Delete(file);
                         }
                         else
@@ -776,6 +777,8 @@ namespace SharpENDEC
             }
         }
 
+        public static bool IsAdministrator => new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator);
+
         /// <summary>
         /// This method should only be called when the program is started or restarted.
         /// </summary>
@@ -785,9 +788,10 @@ namespace SharpENDEC
                 $"Ported from ApatheticDELL's QuantumENDEC 4.\r\n\r\n" +
                 $"Project created by BunnyTub.\r\n" +
                 $"Logo created by ApatheticDELL.\r\n" +
-                $"Translations may not be 100% accurate due to language deviations.");
+                $"Translations may not be 100% accurate due to language deviations.\r\n");
 
             if (RecoveredFromProblem) ColorLine(SVDictionary.RecoveredFromFailure(Settings.Default.CurrentLanguage), ConsoleColor.DarkRed);
+            if (IsAdministrator) ColorLine(SVDictionary.ElevationSecurityProblem(Settings.Default.CurrentLanguage), ConsoleColor.Yellow);
 
             CheckFolder(FileQueueDirectory, RecoveredFromProblem);
             CheckFolder(FileHistoryDirectory, RecoveredFromProblem);
@@ -799,9 +803,32 @@ namespace SharpENDEC
                 Resources.attn.CopyTo(mem);
                 File.WriteAllBytes("Audio\\attn.wav", mem.ToArray());
                 mem.Dispose();
+                Console.WriteLine("The attention tone audio \"attn.wav\" does not exist. The default one will be used instead.");
             }
 
-            Thread.Sleep(2500);
+            Console.WriteLine();
+            Console.WriteLine($"Press space to pause for 30 seconds.");
+
+            bool alreadyPaused = false;
+
+            for (int i = 5; i > 0; i--)
+            {
+                if (alreadyPaused) break;
+                Thread.Sleep(1000);
+
+                if (Console.KeyAvailable)
+                {
+                    switch (Console.ReadKey(true).Key)
+                    {
+                        case ConsoleKey.Spacebar:
+                            Console.WriteLine("Paused for 30 seconds.");
+                            Thread.Sleep(30000);
+                            alreadyPaused = true;
+                            continue;
+                    }
+                }
+            }
+            Console.Clear();
         }
 
         /// <summary>
@@ -1161,238 +1188,238 @@ namespace SharpENDEC
         {
             try
             {
-
-            }
-            catch (ThreadAbortException)
-            {
-                Console.WriteLine($"{SVDictionary.ThreadShutdown(Settings.Default.CurrentLanguage, $"File Processor")}");
-            }
-            while (true)
-            {
-                Console.WriteLine($"{SVDictionary.LastDataReceived(Settings.Default.CurrentLanguage)} {DateTime.Now:yyyy-MM-dd HH:mm:ss}.");
-                string resultFileName = Check.WatchNotify();
-                ColorLine($"[Relayer] {SVDictionary.CapturedFromFileWatcher(Settings.Default.CurrentLanguage)} {resultFileName}", ConsoleColor.Cyan);
-                if (File.Exists($"{AssemblyDirectory}\\relay.xml")) File.Delete($"{AssemblyDirectory}\\relay.xml");
-                WaitForFile($"{FileQueueDirectory}\\{resultFileName}");
-                File.Move($"{FileQueueDirectory}\\{resultFileName}", $"{AssemblyDirectory}\\relay.xml");
-
-                string relayXML = File.ReadAllText("relay.xml", Encoding.UTF8);
-
-                if (relayXML.Contains("<sender>NAADS-Heartbeat</sender>"))
+                while (true)
                 {
-                    ColorLine($"[File Processor] {SVDictionary.HeartbeatDetected(Settings.Default.CurrentLanguage)}", ConsoleColor.Green);
-                    Match referencesMatch = Regex.Match(relayXML, @"<references>\s*(.*?)\s*</references>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
-                    if (referencesMatch.Success)
+                    string resultFileName = Check.WatchNotify();
+                    ColorLine($"[File Processor] {SVDictionary.CapturedFromFileWatcher(Settings.Default.CurrentLanguage)} {resultFileName}", ConsoleColor.Cyan);
+                    if (File.Exists($"{AssemblyDirectory}\\relay.xml")) File.Delete($"{AssemblyDirectory}\\relay.xml");
+                    WaitForFile($"{FileQueueDirectory}\\{resultFileName}");
+                    File.Move($"{FileQueueDirectory}\\{resultFileName}", $"{AssemblyDirectory}\\relay.xml");
+
+                    string relayXML = File.ReadAllText("relay.xml", Encoding.UTF8);
+
+                    if (relayXML.Contains("<sender>NAADS-Heartbeat</sender>"))
                     {
-                        string references = referencesMatch.Groups[1].Value;
-                        //Console.WriteLine(referencesMatch.Groups[0].Value);
-                        //Console.WriteLine(referencesMatch.Groups[1].Value);
-                        Check.Heartbeat(references);
-                    }
-                }
-                else
-                {
-                    ColorLine($"[File Processor] {SVDictionary.AlertDetected(Settings.Default.CurrentLanguage)}", ConsoleColor.Green);
-                    File.Move("relay.xml", $"{FileHistoryDirectory}\\{resultFileName}");
-                    bool IsUI = Settings.Default.WirelessAlertMode;
-                    foreach (Match match in Regex.Matches(relayXML, @"<valueName>([^<]+)</valueName>\s*<value>([^<]+)</value>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline))
-                    {
-                        if (match.Groups[1].Value == "layer:SOREM:2.0:WirelessText")
+                        ColorLine($"[File Processor] {SVDictionary.HeartbeatDetected(Settings.Default.CurrentLanguage)}", ConsoleColor.Green);
+                        Match referencesMatch = Regex.Match(relayXML, @"<references>\s*(.*?)\s*</references>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                        if (referencesMatch.Success)
                         {
-                            if (!string.IsNullOrWhiteSpace(match.Groups[2].Value))
+                            string references = referencesMatch.Groups[1].Value;
+                            //Console.WriteLine(referencesMatch.Groups[0].Value);
+                            //Console.WriteLine(referencesMatch.Groups[1].Value);
+                            Check.Heartbeat(references);
+                        }
+                    }
+                    else
+                    {
+                        ColorLine($"[File Processor] {SVDictionary.AlertDetected(Settings.Default.CurrentLanguage)}", ConsoleColor.Green);
+                        File.Move("relay.xml", $"{FileHistoryDirectory}\\{resultFileName}");
+                        bool IsUI = Settings.Default.WirelessAlertMode;
+                        foreach (Match match in Regex.Matches(relayXML, @"<valueName>([^<]+)</valueName>\s*<value>([^<]+)</value>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline))
+                        {
+                            if (match.Groups[1].Value == "layer:SOREM:2.0:WirelessText")
                             {
-                                IsUI = true;
+                                if (!string.IsNullOrWhiteSpace(match.Groups[2].Value))
+                                {
+                                    IsUI = true;
+                                    break;
+                                }
+                            }
+
+                            //Console.WriteLine($"valueName: {match.Groups[1].Value}");
+                            //Console.WriteLine($"value: {match.Groups[2].Value}");
+                        }
+
+                        Match sentMatch = Regex.Match(relayXML, @"<sent>\s*(.*?)\s*</sent>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                        Match statusMatch = Regex.Match(relayXML, @"<status>\s*(.*?)\s*</status>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                        Match messageTypeMatch = Regex.Match(relayXML, @"<msgType>\s*(.*?)\s*</msgType>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                        MatchCollection broadcastImmediatelyMatches = Regex.Matches(relayXML, @"<valueName>layer:SOREM:1.0:Broadcast_Immediately</valueName>\s*<value>\s*(.*?)\s*</value>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                        MatchCollection urgencyMatches = Regex.Matches(relayXML, @"<urgency>\s*(.*?)\s*</urgency>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                        MatchCollection severityMatches = Regex.Matches(relayXML, @"<severity>\s*(.*?)\s*</severity>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
+
+                        bool final = false;
+
+                        for (int i = 0; i < severityMatches.Count; i++)
+                        {
+                            if (Check.Config(relayXML, statusMatch.Groups[1].Value, messageTypeMatch.Groups[1].Value, severityMatches[i].Groups[1].Value, urgencyMatches[i].Groups[1].Value, broadcastImmediatelyMatches[i].Groups[1].Value))
+                            {
+                                final = true;
                                 break;
                             }
                         }
 
-                        //Console.WriteLine($"valueName: {match.Groups[1].Value}");
-                        //Console.WriteLine($"value: {match.Groups[2].Value}");
-                    }
-
-                    Match sentMatch = Regex.Match(relayXML, @"<sent>\s*(.*?)\s*</sent>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
-                    Match statusMatch = Regex.Match(relayXML, @"<status>\s*(.*?)\s*</status>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
-                    Match messageTypeMatch = Regex.Match(relayXML, @"<msgType>\s*(.*?)\s*</msgType>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
-                    MatchCollection broadcastImmediatelyMatches = Regex.Matches(relayXML, @"<valueName>layer:SOREM:1.0:Broadcast_Immediately</valueName>\s*<value>\s*(.*?)\s*</value>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
-                    MatchCollection urgencyMatches = Regex.Matches(relayXML, @"<urgency>\s*(.*?)\s*</urgency>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
-                    MatchCollection severityMatches = Regex.Matches(relayXML, @"<severity>\s*(.*?)\s*</severity>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
-                    
-                    bool final = false;
-
-                    for (int i = 0; i < severityMatches.Count; i++)
-                    {
-                        if (Check.Config(relayXML, statusMatch.Groups[1].Value, messageTypeMatch.Groups[1].Value, severityMatches[i].Groups[1].Value, urgencyMatches[i].Groups[1].Value, broadcastImmediatelyMatches[i].Groups[1].Value))
+                        if (!final)
                         {
-                            final = true;
-                            break;
-                        }
-                    }
-
-                    if (!final)
-                    {
-                        Console.WriteLine($"[File Processor] {SVDictionary.FileIgnoredDueToPreferences(Settings.Default.CurrentLanguage)}");
-                        continue;
-                    }
-
-                    MatchCollection infoMatches = Regex.Matches(relayXML, @"<info>\s*(.*?)\s*</info>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
-                    int infoProc = 0;
-
-                    foreach (Match infoMatch in infoMatches)
-                    {
-                        infoProc++;
-                        Console.WriteLine($"[File Processor] Processing match {infoProc} of {infoMatches.Count}.");
-                        string infoEN = $"<info>{infoMatch.Groups[1].Value}</info>";
-                        string lang = "en";
-                        if (Regex.Match(infoEN, @"<language>\s*(.*?)\s*</language>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline).Groups[1].Value == "fr-CA")
-                        {
-                            lang = "fr";
-                        }
-                        if (lang != "en")
-                        {
+                            Console.WriteLine($"[File Processor] {SVDictionary.FileIgnoredDueToPreferences(Settings.Default.CurrentLanguage)}");
                             continue;
                         }
 
-                        string Status = statusMatch.Groups[1].Value;
-                        string MsgType = messageTypeMatch.Groups[1].Value;
-                        string EventType = Regex.Match(infoEN, @"<event>\s*(.*?)\s*</event>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline).Groups[1].Value;
-                        string urgency = Regex.Match(infoEN, @"<urgency>\s*(.*?)\s*</urgency>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline).Groups[1].Value;
-                        string severity = Regex.Match(infoEN, @"<severity>\s*(.*?)\s*</severity>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline).Groups[1].Value;
-                        string broadcastImmediately;
-                        Match broadcastImmediatelyMatch = Regex.Match(infoEN, @"<valueName>layer:SOREM:1.0:Broadcast_Immediately</valueName>\s*<value>\s*(.*?)\s*</value>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
-                        if (broadcastImmediatelyMatch.Success)
+                        MatchCollection infoMatches = Regex.Matches(relayXML, @"<info>\s*(.*?)\s*</info>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                        int infoProc = 0;
+
+                        foreach (Match infoMatch in infoMatches)
                         {
-                            broadcastImmediately = broadcastImmediatelyMatch.Groups[1].Value;
-                        }
-                        else
-                        {
-                            broadcastImmediately = "No";
-                        }
-
-                        EventDetails EventInfo = GetEventDetails(EventType);
-
-                        ColorLine(Status, ConsoleColor.DarkGray);
-                        ColorLine(MsgType, ConsoleColor.DarkGray);
-                        ColorLine($"{EventType} | {EventInfo.FriendlyName} | EventInfo.Color", ConsoleColor.DarkGray);
-                        ColorLine(urgency, ConsoleColor.DarkGray);
-                        ColorLine(severity, ConsoleColor.DarkGray);
-                        ColorLine(broadcastImmediately, ConsoleColor.DarkGray);
-
-                        if (Check.Config(infoEN, statusMatch.Groups[1].Value, MsgType, severity, urgency, broadcastImmediately))
-                        {
-                            Console.WriteLine($"[File Processor] {SVDictionary.GeneratingProductText(Settings.Default.CurrentLanguage)}");
-
-                            Console.WriteLine($"0: {messageTypeMatch.Groups[0].Value}");
-                            Console.WriteLine($"1: {messageTypeMatch.Groups[1].Value}");
-                            Console.WriteLine($"2: {messageTypeMatch.Groups[2].Value}");
-                            Console.WriteLine($"3: {messageTypeMatch.Groups[3].Value}");
-                            Console.WriteLine($"4: {messageTypeMatch.Groups[4].Value}");
-
-                            Generate gen = new Generate(infoEN, sentMatch.Groups[1].Value, DateTime.Now.ToString());
-
-                            var info = gen.BroadcastInfo(lang);
-
-                            if (true) //(!string.IsNullOrWhiteSpace(info.BroadcastText))
+                            infoProc++;
+                            Console.WriteLine($"[File Processor] Processing match {infoProc} of {infoMatches.Count}.");
+                            string infoEN = $"<info>{infoMatch.Groups[1].Value}</info>";
+                            string lang = "en";
+                            if (Regex.Match(infoEN, @"<language>\s*(.*?)\s*</language>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline).Groups[1].Value == "fr-CA")
                             {
-                                //Console.WriteLine($"[File Processor] {SVDictionary.GeneratingProductAudio}");
-                                File.WriteAllText($"{AssemblyDirectory}\\inactive-text.txt", string.Empty);
-                                File.WriteAllText($"{AssemblyDirectory}\\active-text.txt", $"{info.BroadcastText}\x20");
-                                File.WriteAllText($"{AssemblyDirectory}\\static-text.txt", $"{info.BroadcastText}\x20");
+                                lang = "fr";
+                            }
+                            if (lang != "en")
+                            {
+                                continue;
+                            }
 
-                                Console.WriteLine($"[File Processor] -> {info.BroadcastText}");
-
-                                gen.GenerateAudio(info.BroadcastText, lang);
-
-                                WaitForFile($"{FileQueueDirectory}\\{resultFileName}");
-
-                                if (IsUI)
-                                {
-                                    Color BackColor;
-                                    Color ForeColor;
-
-                                    switch (severity)
-                                    {
-                                        case "Extreme":
-                                            BackColor = Color.Red;
-                                            ForeColor = Color.Yellow;
-                                            break;
-                                        case "Severe":
-                                            BackColor = Color.OrangeRed;
-                                            ForeColor = Color.Black;
-                                            break;
-                                        case "Moderate":
-                                            BackColor = Color.Gold;
-                                            ForeColor = Color.Black;
-                                            break;
-                                        case "Minor":
-                                            BackColor = Color.LightGreen;
-                                            ForeColor = Color.Black;
-                                            break;
-                                        case "Unknown":
-                                            BackColor = Color.White;
-                                            ForeColor = Color.Black;
-                                            break;
-                                        default:
-                                            BackColor = Color.White;
-                                            ForeColor = Color.Black;
-                                            break;
-                                    }
-
-                                    //Task.Run(() =>
-                                    //{
-                                    //    AlertForm af = new AlertForm
-                                    //    {
-                                    //        PlayAudio = () => Play($"{AudioDirectory}\\audio.wav"),
-                                    //        EventBackColor = BackColor,
-                                    //        EventForeColor = ForeColor,
-                                    //        EventTextContent = EventInfo.FriendlyName
-                                    //    };
-                                    //    af.Show();
-                                    //}).Wait(30000);
-                                    
-                                    Task.Run(() =>
-                                    {
-                                        NotifyOverlay no = new NotifyOverlay
-                                        {
-                                            EventShortInfoText = $"{EventInfo.FriendlyName}",
-                                            EventLongInfoText = $"{info.BroadcastText}",
-                                            EventTypeText = $"{EventInfo.FriendlyName}"
-                                        };
-                                        no.ShowDialog();
-                                    }).Wait(30000);
-                                }
-                                else
-                                {
-                                    Console.WriteLine($"[File Processor] {SVDictionary.PlayingAudio(Settings.Default.CurrentLanguage)}");
-                                    Console.WriteLine($"[File Processor] Played {Play($"{AudioDirectory}\\in.wav").AudioLength.TotalMilliseconds} millisecond(s) of audio.");
-                                    if (EventInfo.Severity.Contains("Severe") || EventInfo.Severity.Contains("Extreme"))
-                                        Console.WriteLine($"[File Processor] Played {Play($"{AudioDirectory}\\attn.wav").AudioLength.TotalMilliseconds} millisecond(s) of audio.");
-                                    else
-                                    {
-                                        var (FilePlayed, AudioLength) = Play($"{AudioDirectory}\\attn-minor.wav");
-                                        if (FilePlayed)
-                                            Console.WriteLine($"[File Processor] Played {Play($"{AudioDirectory}\\attn-minor.wav").AudioLength.TotalMilliseconds} millisecond(s) of audio.");
-                                        else
-                                            Console.WriteLine($"[File Processor] Played {Play($"{AudioDirectory}\\attn.wav").AudioLength.TotalMilliseconds} millisecond(s) of audio.");
-                                    }
-                                    //Console.WriteLine($"[File Processor] Attention tone not played because the alert severity is not severe or extreme.");
-                                    Console.WriteLine($"[File Processor] Played {Play($"{AudioDirectory}\\audio.wav").AudioLength.TotalMilliseconds} millisecond(s) of audio.");
-                                    Console.WriteLine($"[File Processor] Played {Play($"{AudioDirectory}\\out.wav").AudioLength.TotalMilliseconds} millisecond(s) of audio.");
-                                }
-
-                                File.WriteAllText($"{AssemblyDirectory}\\active-text.txt", string.Empty);
-                                File.WriteAllText($"{AssemblyDirectory}\\inactive-text.txt", $"{info.BroadcastText}\x20");
+                            string Status = statusMatch.Groups[1].Value;
+                            string MsgType = messageTypeMatch.Groups[1].Value;
+                            string EventType = Regex.Match(infoEN, @"<event>\s*(.*?)\s*</event>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline).Groups[1].Value;
+                            string urgency = Regex.Match(infoEN, @"<urgency>\s*(.*?)\s*</urgency>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline).Groups[1].Value;
+                            string severity = Regex.Match(infoEN, @"<severity>\s*(.*?)\s*</severity>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline).Groups[1].Value;
+                            string broadcastImmediately;
+                            Match broadcastImmediatelyMatch = Regex.Match(infoEN, @"<valueName>layer:SOREM:1.0:Broadcast_Immediately</valueName>\s*<value>\s*(.*?)\s*</value>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                            if (broadcastImmediatelyMatch.Success)
+                            {
+                                broadcastImmediately = broadcastImmediatelyMatch.Groups[1].Value;
                             }
                             else
                             {
-                                Console.WriteLine($"[File Processor] {SVDictionary.GeneratedProductEmpty(Settings.Default.CurrentLanguage)}");
+                                broadcastImmediately = "No";
+                            }
+
+                            EventDetails EventInfo = GetEventDetails(EventType);
+
+                            ColorLine(Status, ConsoleColor.DarkGray);
+                            ColorLine(MsgType, ConsoleColor.DarkGray);
+                            ColorLine($"{EventType} | {EventInfo.FriendlyName} | EventInfo.Color", ConsoleColor.DarkGray);
+                            ColorLine(urgency, ConsoleColor.DarkGray);
+                            ColorLine(severity, ConsoleColor.DarkGray);
+                            ColorLine(broadcastImmediately, ConsoleColor.DarkGray);
+
+                            if (Check.Config(infoEN, statusMatch.Groups[1].Value, MsgType, severity, urgency, broadcastImmediately))
+                            {
+                                Console.WriteLine($"[File Processor] {SVDictionary.GeneratingProductText(Settings.Default.CurrentLanguage)}");
+
+                                Console.WriteLine($"0: {messageTypeMatch.Groups[0].Value}");
+                                Console.WriteLine($"1: {messageTypeMatch.Groups[1].Value}");
+                                Console.WriteLine($"2: {messageTypeMatch.Groups[2].Value}");
+                                Console.WriteLine($"3: {messageTypeMatch.Groups[3].Value}");
+                                Console.WriteLine($"4: {messageTypeMatch.Groups[4].Value}");
+
+                                Generate gen = new Generate(infoEN, sentMatch.Groups[1].Value, DateTime.Now.ToString());
+
+                                var info = gen.BroadcastInfo(lang);
+
+                                if (true) //(!string.IsNullOrWhiteSpace(info.BroadcastText))
+                                {
+                                    //Console.WriteLine($"[File Processor] {SVDictionary.GeneratingProductAudio}");
+                                    File.WriteAllText($"{AssemblyDirectory}\\inactive-text.txt", string.Empty);
+                                    File.WriteAllText($"{AssemblyDirectory}\\active-text.txt", $"{info.BroadcastText}\x20");
+                                    File.WriteAllText($"{AssemblyDirectory}\\static-text.txt", $"{info.BroadcastText}\x20");
+
+                                    Console.WriteLine($"[File Processor] -> {info.BroadcastText}");
+
+                                    gen.GenerateAudio(info.BroadcastText, lang);
+
+                                    WaitForFile($"{FileQueueDirectory}\\{resultFileName}");
+
+                                    if (IsUI)
+                                    {
+                                        Color BackColor;
+                                        Color ForeColor;
+
+                                        switch (severity)
+                                        {
+                                            case "Extreme":
+                                                BackColor = Color.Red;
+                                                ForeColor = Color.Yellow;
+                                                break;
+                                            case "Severe":
+                                                BackColor = Color.OrangeRed;
+                                                ForeColor = Color.Black;
+                                                break;
+                                            case "Moderate":
+                                                BackColor = Color.Gold;
+                                                ForeColor = Color.Black;
+                                                break;
+                                            case "Minor":
+                                                BackColor = Color.LightGreen;
+                                                ForeColor = Color.Black;
+                                                break;
+                                            case "Unknown":
+                                                BackColor = Color.White;
+                                                ForeColor = Color.Black;
+                                                break;
+                                            default:
+                                                BackColor = Color.White;
+                                                ForeColor = Color.Black;
+                                                break;
+                                        }
+
+                                        //Task.Run(() =>
+                                        //{
+                                        //    AlertForm af = new AlertForm
+                                        //    {
+                                        //        PlayAudio = () => Play($"{AudioDirectory}\\audio.wav"),
+                                        //        EventBackColor = BackColor,
+                                        //        EventForeColor = ForeColor,
+                                        //        EventTextContent = EventInfo.FriendlyName
+                                        //    };
+                                        //    af.Show();
+                                        //}).Wait(30000);
+
+                                        Task.Run(() =>
+                                        {
+                                            NotifyOverlay no = new NotifyOverlay
+                                            {
+                                                EventShortInfoText = $"{EventInfo.FriendlyName}",
+                                                EventLongInfoText = $"{info.BroadcastText}",
+                                                EventTypeText = $"{EventInfo.FriendlyName}"
+                                            };
+                                            no.ShowDialog();
+                                        }).Wait(30000);
+                                    }
+                                    else
+                                    {
+                                        Console.WriteLine($"[File Processor] {SVDictionary.PlayingAudio(Settings.Default.CurrentLanguage)}");
+                                        Console.WriteLine($"[File Processor] Played {Play($"{AudioDirectory}\\in.wav").AudioLength.TotalMilliseconds} millisecond(s) of audio.");
+                                        if (EventInfo.Severity.Contains("Severe") || EventInfo.Severity.Contains("Extreme"))
+                                            Console.WriteLine($"[File Processor] Played {Play($"{AudioDirectory}\\attn.wav").AudioLength.TotalMilliseconds} millisecond(s) of audio.");
+                                        else
+                                        {
+                                            var (FilePlayed, AudioLength) = Play($"{AudioDirectory}\\attn-minor.wav");
+                                            if (FilePlayed)
+                                                Console.WriteLine($"[File Processor] Played {Play($"{AudioDirectory}\\attn-minor.wav").AudioLength.TotalMilliseconds} millisecond(s) of audio.");
+                                            else
+                                                Console.WriteLine($"[File Processor] Played {Play($"{AudioDirectory}\\attn.wav").AudioLength.TotalMilliseconds} millisecond(s) of audio.");
+                                        }
+                                        //Console.WriteLine($"[File Processor] Attention tone not played because the alert severity is not severe or extreme.");
+                                        Console.WriteLine($"[File Processor] Played {Play($"{AudioDirectory}\\audio.wav").AudioLength.TotalMilliseconds} millisecond(s) of audio.");
+                                        Console.WriteLine($"[File Processor] Played {Play($"{AudioDirectory}\\out.wav").AudioLength.TotalMilliseconds} millisecond(s) of audio.");
+                                    }
+
+                                    File.WriteAllText($"{AssemblyDirectory}\\active-text.txt", string.Empty);
+                                    File.WriteAllText($"{AssemblyDirectory}\\inactive-text.txt", $"{info.BroadcastText}\x20");
+                                }
+                                else
+                                {
+                                    Console.WriteLine($"[File Processor] {SVDictionary.GeneratedProductEmpty(Settings.Default.CurrentLanguage)}");
+                                }
+                            }
+                            else
+                            {
+                                Console.WriteLine($"[File Processor] {SVDictionary.FileIgnoredDueToPreferences(Settings.Default.CurrentLanguage)}");
                             }
                         }
-                        else
-                        {
-                            Console.WriteLine($"[File Processor] {SVDictionary.FileIgnoredDueToPreferences(Settings.Default.CurrentLanguage)}");
-                        }
                     }
+
+                    Console.WriteLine($"[File Processor] {SVDictionary.LastDataReceived(Settings.Default.CurrentLanguage)} {DateTime.Now:yyyy-MM-dd HH:mm:ss}.");
                 }
+            }
+            catch (ThreadAbortException)
+            {
+                Console.WriteLine($"{SVDictionary.ThreadShutdown(Settings.Default.CurrentLanguage, $"File Processor")}");
             }
         }
 
@@ -1509,7 +1536,7 @@ namespace SharpENDEC
         {
             return new Thread(() =>
             {
-                string ProgramVersion = VersionInfo.FriendlyVersion;
+                string ProgramVersion = FriendlyVersion;
                 Init(ProgramVersion, false);
 
                 void RestartThread(ref Thread serviceThread, ThreadStart method)
@@ -1589,14 +1616,7 @@ namespace SharpENDEC
         [STAThread]
         private static void Main()
         {
-            if (!VersionInfo.IsCuttingEdge)
-            {
-                VersionInfo.FriendlyVersion = $"SharpENDEC {VersionInfo.ReleaseVersion}.{VersionInfo.MinorVersion} | Release";
-            }
-            else
-            {
-                VersionInfo.FriendlyVersion = $"SharpENDEC {VersionInfo.ReleaseVersion}.{VersionInfo.MinorVersion}-c | Cutting Edge (unstable)";
-            }
+            Console.ForegroundColor = ConsoleColor.White;
             // PLUGIN IMPLEMENTATION!!!
             // BATTERY IMPLEMENTATION!!!
             // GUI IMPLEMENTATION!!!
@@ -1906,6 +1926,20 @@ namespace SharpENDEC
                 case "en":
                 default:
                     return $"Starting connection to {server}:{port}.";
+            }
+        }
+
+        public static string ElevationSecurityProblem(string lang)
+        {
+            switch (lang)
+            {
+                case "fr":
+                    return $"L’exécution de SharpENDEC elevated n’améliore pas les performances et peut poser un risque de sécurité dans certaines situations.\r\n" +
+                        $"Veuillez exécuter SharpENDEC sans élévation la prochaine fois que vous l’exécuterez !";
+                case "en":
+                default:
+                    return $"Running SharpENDEC elevated doesn't improve performance, and may pose a security risk in some situations.\r\n" +
+                        $"Please run SharpENDEC without elevation next time you run it!";
             }
         }
     }
