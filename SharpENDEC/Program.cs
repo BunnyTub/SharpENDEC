@@ -1301,11 +1301,11 @@ namespace SharpENDEC
                             {
                                 Console.WriteLine($"[File Processor] {SVDictionary.GeneratingProductText(Settings.Default.CurrentLanguage)}");
 
-                                Console.WriteLine($"0: {messageTypeMatch.Groups[0].Value}");
-                                Console.WriteLine($"1: {messageTypeMatch.Groups[1].Value}");
-                                Console.WriteLine($"2: {messageTypeMatch.Groups[2].Value}");
-                                Console.WriteLine($"3: {messageTypeMatch.Groups[3].Value}");
-                                Console.WriteLine($"4: {messageTypeMatch.Groups[4].Value}");
+                                //Console.WriteLine($"0: {messageTypeMatch.Groups[0].Value}");
+                                //Console.WriteLine($"1: {messageTypeMatch.Groups[1].Value}");
+                                //Console.WriteLine($"2: {messageTypeMatch.Groups[2].Value}");
+                                //Console.WriteLine($"3: {messageTypeMatch.Groups[3].Value}");
+                                //Console.WriteLine($"4: {messageTypeMatch.Groups[4].Value}");
 
                                 Generate gen = new Generate(infoEN, sentMatch.Groups[1].Value, DateTime.Now.ToString());
 
