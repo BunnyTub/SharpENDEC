@@ -7,7 +7,7 @@ namespace SharpENDEC
         // ---
         // Use VersionInfoTemplate.cs!
         public const string BuiltOnDate = "2024-10-16";
-        public const string BuiltOnTime = "13:27";
+        public const string BuiltOnTime = "13:32";
         public const string BuiltTimeZone = "Eastern Standard Time";
         public static readonly int ReleaseVersion = 1;
         public static readonly int MinorVersion = 2;

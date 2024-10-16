@@ -282,7 +282,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="attn.wav" />
-    <Content Include="EASfusionLogo.ico" />
     <Content Include="FodyWeavers.xml" />
     <Content Include="SharpENDEC.ico" />
   </ItemGroup>
@@ -318,11 +317,10 @@ del "$(TargetDir)NAudio.xml"
 
 del "$(TargetDir)Newtonsoft.Json.xml"
 
-del "$(TargetDir)System.Diagnostics.DiagnosticSource.xml"
-</PostBuildEvent>
+del "$(TargetDir)System.Diagnostics.DiagnosticSource.xml"</PostBuildEvent>
   </PropertyGroup>
   <PropertyGroup>
     <PreBuildEvent>cd $(ProjectDir)
-powershell -ExecutionPolicy Bypass -File "$(ProjectDir)\UpdateVersionInfo.ps1"</PreBuildEvent>
+powershell -ExecutionPolicy Bypass -File "$(ProjectDir)UpdateVersionInfo.ps1"</PreBuildEvent>
   </PropertyGroup>
 </Project>

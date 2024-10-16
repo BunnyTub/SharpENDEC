@@ -778,6 +778,7 @@ namespace SharpENDEC
         }
 
         public static bool IsAdministrator => new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator);
+        public static bool IsGuest => new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Guest);
 
         /// <summary>
         /// This method should only be called when the program is started or restarted.
@@ -792,6 +793,7 @@ namespace SharpENDEC
 
             if (RecoveredFromProblem) ColorLine(SVDictionary.RecoveredFromFailure(Settings.Default.CurrentLanguage), ConsoleColor.DarkRed);
             if (IsAdministrator) ColorLine(SVDictionary.ElevationSecurityProblem(Settings.Default.CurrentLanguage), ConsoleColor.Yellow);
+            if (IsGuest) ColorLine(SVDictionary.ConfigurationLossProblem(Settings.Default.CurrentLanguage), ConsoleColor.Yellow);
 
             CheckFolder(FileQueueDirectory, RecoveredFromProblem);
             CheckFolder(FileHistoryDirectory, RecoveredFromProblem);
@@ -807,7 +809,7 @@ namespace SharpENDEC
             }
 
             Console.WriteLine();
-            Console.WriteLine($"Press space to pause for 30 seconds.");
+            Console.WriteLine($"Press SPACE to pause for 30 seconds.");
 
             bool alreadyPaused = false;
 
@@ -1940,6 +1942,20 @@ namespace SharpENDEC
                 default:
                     return $"Running SharpENDEC elevated doesn't improve performance, and may pose a security risk in some situations.\r\n" +
                         $"Please run SharpENDEC without elevation next time you run it!";
+            }
+        }
+
+        internal static string ConfigurationLossProblem(string lang)
+        {
+            switch (lang)
+            {
+                case "fr":
+                    return $"Vous perdrez probablement votre configuration parce que vous utilisez un compte invité." +
+                        $"S’il vous plaît exécuter SharpENDEC sous un utilisateur normal pour garder votre configuration !";
+                case "en":
+                default:
+                    return $"You will most likely lose your configuration because you are using a guest account.\r\n" +
+                        $"Please run SharpENDEC under a normal user to keep your configuration!";
             }
         }
     }
