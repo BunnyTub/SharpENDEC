@@ -17,6 +17,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.Xml.Linq;
 
 namespace SharpENDEC
 {
@@ -147,7 +148,12 @@ namespace SharpENDEC
                 }
                 catch (TimeoutException)
                 {
-                    Console.WriteLine($"[Capture] {SVDictionary.HostTimedOut(Settings.Default.CurrentLanguage, host)}");
+                    Console.WriteLine($"[{host}:{port}] {SVDictionary.HostTimedOut(Settings.Default.CurrentLanguage, host)}");
+                    return;
+                }
+                catch (ThreadAbortException)
+                {
+                    Console.WriteLine($"{SVDictionary.ThreadShutdown(Settings.Default.CurrentLanguage, $"Stream Processing ({host}:{port})")}");
                     return;
                 }
             }
@@ -161,6 +167,7 @@ namespace SharpENDEC
                     Thread thread = new Thread(() => Receive(server, 8080, "</alert>"));
                     thread.Start();
                     ClientThreads.Add(thread);
+                    Console.WriteLine($"{SVDictionary.StartingConnection(Settings.Default.CurrentLanguage, server, 8080)}");
                 }
 
                 try
@@ -1150,8 +1157,16 @@ namespace SharpENDEC
             }).Wait(2500);
         }
 
-        public static void Relay()
+        public static void FileProcessor()
         {
+            try
+            {
+
+            }
+            catch (ThreadAbortException)
+            {
+                Console.WriteLine($"{SVDictionary.ThreadShutdown(Settings.Default.CurrentLanguage, $"File Processor")}");
+            }
             while (true)
             {
                 Console.WriteLine($"{SVDictionary.LastDataReceived(Settings.Default.CurrentLanguage)} {DateTime.Now:yyyy-MM-dd HH:mm:ss}.");
@@ -1165,7 +1180,7 @@ namespace SharpENDEC
 
                 if (relayXML.Contains("<sender>NAADS-Heartbeat</sender>"))
                 {
-                    ColorLine($"[Relayer] {SVDictionary.HeartbeatDetected(Settings.Default.CurrentLanguage)}", ConsoleColor.Green);
+                    ColorLine($"[File Processor] {SVDictionary.HeartbeatDetected(Settings.Default.CurrentLanguage)}", ConsoleColor.Green);
                     Match referencesMatch = Regex.Match(relayXML, @"<references>\s*(.*?)\s*</references>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
                     if (referencesMatch.Success)
                     {
@@ -1177,7 +1192,7 @@ namespace SharpENDEC
                 }
                 else
                 {
-                    ColorLine($"[Relayer] {SVDictionary.AlertDetected(Settings.Default.CurrentLanguage)}", ConsoleColor.Green);
+                    ColorLine($"[File Processor] {SVDictionary.AlertDetected(Settings.Default.CurrentLanguage)}", ConsoleColor.Green);
                     File.Move("relay.xml", $"{FileHistoryDirectory}\\{resultFileName}");
                     bool IsUI = Settings.Default.WirelessAlertMode;
                     foreach (Match match in Regex.Matches(relayXML, @"<valueName>([^<]+)</valueName>\s*<value>([^<]+)</value>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline))
@@ -1215,7 +1230,7 @@ namespace SharpENDEC
 
                     if (!final)
                     {
-                        Console.WriteLine($"[Relayer] {SVDictionary.FileIgnoredDueToPreferences(Settings.Default.CurrentLanguage)}");
+                        Console.WriteLine($"[File Processor] {SVDictionary.FileIgnoredDueToPreferences(Settings.Default.CurrentLanguage)}");
                         continue;
                     }
 
@@ -1225,7 +1240,7 @@ namespace SharpENDEC
                     foreach (Match infoMatch in infoMatches)
                     {
                         infoProc++;
-                        Console.WriteLine($"[Relayer] Processing match {infoProc} of {infoMatches.Count}.");
+                        Console.WriteLine($"[File Processor] Processing match {infoProc} of {infoMatches.Count}.");
                         string infoEN = $"<info>{infoMatch.Groups[1].Value}</info>";
                         string lang = "en";
                         if (Regex.Match(infoEN, @"<language>\s*(.*?)\s*</language>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline).Groups[1].Value == "fr-CA")
@@ -1264,7 +1279,7 @@ namespace SharpENDEC
 
                         if (Check.Config(infoEN, statusMatch.Groups[1].Value, MsgType, severity, urgency, broadcastImmediately))
                         {
-                            Console.WriteLine($"[Relayer] {SVDictionary.GeneratingProductText(Settings.Default.CurrentLanguage)}");
+                            Console.WriteLine($"[File Processor] {SVDictionary.GeneratingProductText(Settings.Default.CurrentLanguage)}");
 
                             Console.WriteLine($"0: {messageTypeMatch.Groups[0].Value}");
                             Console.WriteLine($"1: {messageTypeMatch.Groups[1].Value}");
@@ -1278,12 +1293,12 @@ namespace SharpENDEC
 
                             if (true) //(!string.IsNullOrWhiteSpace(info.BroadcastText))
                             {
-                                //Console.WriteLine($"[Relayer] {SVDictionary.GeneratingProductAudio}");
+                                //Console.WriteLine($"[File Processor] {SVDictionary.GeneratingProductAudio}");
                                 File.WriteAllText($"{AssemblyDirectory}\\inactive-text.txt", string.Empty);
                                 File.WriteAllText($"{AssemblyDirectory}\\active-text.txt", $"{info.BroadcastText}\x20");
                                 File.WriteAllText($"{AssemblyDirectory}\\static-text.txt", $"{info.BroadcastText}\x20");
 
-                                Console.WriteLine($"[Relayer] -> {info.BroadcastText}");
+                                Console.WriteLine($"[File Processor] -> {info.BroadcastText}");
 
                                 gen.GenerateAudio(info.BroadcastText, lang);
 
@@ -1347,21 +1362,21 @@ namespace SharpENDEC
                                 }
                                 else
                                 {
-                                    Console.WriteLine($"[Relayer] {SVDictionary.PlayingAudio(Settings.Default.CurrentLanguage)}");
-                                    Console.WriteLine($"[Relayer] Played {Play($"{AudioDirectory}\\in.wav").AudioLength.TotalMilliseconds} millisecond(s) of audio.");
+                                    Console.WriteLine($"[File Processor] {SVDictionary.PlayingAudio(Settings.Default.CurrentLanguage)}");
+                                    Console.WriteLine($"[File Processor] Played {Play($"{AudioDirectory}\\in.wav").AudioLength.TotalMilliseconds} millisecond(s) of audio.");
                                     if (EventInfo.Severity.Contains("Severe") || EventInfo.Severity.Contains("Extreme"))
-                                        Console.WriteLine($"[Relayer] Played {Play($"{AudioDirectory}\\attn.wav").AudioLength.TotalMilliseconds} millisecond(s) of audio.");
+                                        Console.WriteLine($"[File Processor] Played {Play($"{AudioDirectory}\\attn.wav").AudioLength.TotalMilliseconds} millisecond(s) of audio.");
                                     else
                                     {
                                         var (FilePlayed, AudioLength) = Play($"{AudioDirectory}\\attn-minor.wav");
                                         if (FilePlayed)
-                                            Console.WriteLine($"[Relayer] Played {Play($"{AudioDirectory}\\attn-minor.wav").AudioLength.TotalMilliseconds} millisecond(s) of audio.");
+                                            Console.WriteLine($"[File Processor] Played {Play($"{AudioDirectory}\\attn-minor.wav").AudioLength.TotalMilliseconds} millisecond(s) of audio.");
                                         else
-                                            Console.WriteLine($"[Relayer] Played {Play($"{AudioDirectory}\\attn.wav").AudioLength.TotalMilliseconds} millisecond(s) of audio.");
+                                            Console.WriteLine($"[File Processor] Played {Play($"{AudioDirectory}\\attn.wav").AudioLength.TotalMilliseconds} millisecond(s) of audio.");
                                     }
-                                    //Console.WriteLine($"[Relayer] Attention tone not played because the alert severity is not severe or extreme.");
-                                    Console.WriteLine($"[Relayer] Played {Play($"{AudioDirectory}\\audio.wav").AudioLength.TotalMilliseconds} millisecond(s) of audio.");
-                                    Console.WriteLine($"[Relayer] Played {Play($"{AudioDirectory}\\out.wav").AudioLength.TotalMilliseconds} millisecond(s) of audio.");
+                                    //Console.WriteLine($"[File Processor] Attention tone not played because the alert severity is not severe or extreme.");
+                                    Console.WriteLine($"[File Processor] Played {Play($"{AudioDirectory}\\audio.wav").AudioLength.TotalMilliseconds} millisecond(s) of audio.");
+                                    Console.WriteLine($"[File Processor] Played {Play($"{AudioDirectory}\\out.wav").AudioLength.TotalMilliseconds} millisecond(s) of audio.");
                                 }
 
                                 File.WriteAllText($"{AssemblyDirectory}\\active-text.txt", string.Empty);
@@ -1369,27 +1384,35 @@ namespace SharpENDEC
                             }
                             else
                             {
-                                Console.WriteLine($"[Relayer] {SVDictionary.GeneratedProductEmpty(Settings.Default.CurrentLanguage)}");
+                                Console.WriteLine($"[File Processor] {SVDictionary.GeneratedProductEmpty(Settings.Default.CurrentLanguage)}");
                             }
                         }
                         else
                         {
-                            Console.WriteLine($"[Relayer] {SVDictionary.FileIgnoredDueToPreferences(Settings.Default.CurrentLanguage)}");
+                            Console.WriteLine($"[File Processor] {SVDictionary.FileIgnoredDueToPreferences(Settings.Default.CurrentLanguage)}");
                         }
                     }
                 }
             }
         }
 
-        public static void CAP()
+        public static void StreamProcessor()
         {
-            while (true)
+            try
             {
-                if (new Capture().Main())
+                while (true)
                 {
-                    break;
+                    if (new Capture().Main())
+                    {
+                        break;
+                    }
+                    Thread.Sleep(5000);
                 }
-                Thread.Sleep(5000);
+                Console.WriteLine("Stream Processor was stopped.");
+            }
+            catch (ThreadAbortException)
+            {
+                Console.WriteLine("Stream Processor was stopped.");
             }
         }
 
@@ -1418,34 +1441,34 @@ namespace SharpENDEC
             else return (false, TimeSpan.Zero);
         }
 
-        public static Thread MethodToThread(Action method)
-        {
-            return new Thread(() =>
-            {
-                try
-                {
-                    method();
-                }
-                catch (ThreadAbortException ex)
-                {
-                    Console.WriteLine($"Shutdown caught in thread: {ex.Message}");
-                    File.AppendAllText($"{AssemblyDirectory}\\exception.log",
-                        $"{DateTime.Now:G} | Shutdown in {method.Method.Name}\r\n" +
-                        $"{ex.StackTrace}\r\n" +
-                        $"{ex.Source}\r\n" +
-                        $"{ex.Message}\r\n");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Exception caught in thread: {ex.Message}");
-                    File.AppendAllText($"{AssemblyDirectory}\\exception.log",
-                        $"{DateTime.Now:G} | Exception in {method.Method.Name}\r\n" +
-                        $"{ex.StackTrace}\r\n" +
-                        $"{ex.Source}\r\n" +
-                        $"{ex.Message}\r\n");
-                }
-            });
-        }
+        //public static Thread MethodToThread(Action method)
+        //{
+        //    return new Thread(() =>
+        //    {
+        //        try
+        //        {
+        //            method();
+        //        }
+        //        catch (ThreadAbortException ex)
+        //        {
+        //            Console.WriteLine($"Shutdown caught in thread: {ex.Message}");
+        //            File.AppendAllText($"{AssemblyDirectory}\\exception.log",
+        //                $"{DateTime.Now:G} | Shutdown in {method.Method.Name}\r\n" +
+        //                $"{ex.StackTrace}\r\n" +
+        //                $"{ex.Source}\r\n" +
+        //                $"{ex.Message}\r\n");
+        //        }
+        //        catch (Exception ex)
+        //        {
+        //            Console.WriteLine($"Exception caught in thread: {ex.Message}");
+        //            File.AppendAllText($"{AssemblyDirectory}\\exception.log",
+        //                $"{DateTime.Now:G} | Exception in {method.Method.Name}\r\n" +
+        //                $"{ex.StackTrace}\r\n" +
+        //                $"{ex.Source}\r\n" +
+        //                $"{ex.Message}\r\n");
+        //        }
+        //    });
+        //}
 
         public static void KeyboardProcessor()
         {
@@ -1486,13 +1509,16 @@ namespace SharpENDEC
         {
             return new Thread(() =>
             {
-                string ProgramVersion = Program.FriendlyVersion;
+                string ProgramVersion = VersionInfo.FriendlyVersion;
                 Init(ProgramVersion, false);
 
                 void RestartThread(ref Thread serviceThread, ThreadStart method)
                 {
-                    if (serviceThread.ThreadState != ThreadState.Stopped && serviceThread.ThreadState != ThreadState.Unstarted)
-                        serviceThread.Abort();
+                    if (serviceThread != null)
+                    {
+                        if (serviceThread.ThreadState != ThreadState.Stopped && serviceThread.ThreadState != ThreadState.Unstarted)
+                            serviceThread.Abort();
+                    }
 
                     serviceThread = new Thread(method);
                     serviceThread.Start();
@@ -1501,12 +1527,12 @@ namespace SharpENDEC
                 void ShutdownCapture()
                 {
                     capture.ShutdownCapture = true;
-                    Console.WriteLine("Waiting for CAP to shutdown.");
+                    Console.WriteLine("Waiting for File Processor to shutdown.");
                     while (capture.ShutdownCapture)
                     {
                         Thread.Sleep(500);
                     }
-                    Console.WriteLine("CAP has been stopped.");
+                    Console.WriteLine("File Processor has been stopped.");
                 }
 
                 while (true)
@@ -1514,8 +1540,8 @@ namespace SharpENDEC
                     Config();
                     Check.LastHeartbeat = DateTime.Now;
 
-                    RestartThread(ref Program.CAPService, CAP);
-                    RestartThread(ref Program.RelayService, Relay);
+                    RestartThread(ref Program.StreamService, StreamProcessor);
+                    RestartThread(ref Program.RelayService, FileProcessor);
                     RestartThread(ref Program.KeyboardProc, KeyboardProcessor);
 
                     while (true)
@@ -1529,8 +1555,8 @@ namespace SharpENDEC
                                 try
                                 {
                                     ShutdownCapture();
-                                    RestartThread(ref Program.CAPService, CAP);
-                                    RestartThread(ref Program.RelayService, Relay);
+                                    RestartThread(ref Program.StreamService, StreamProcessor);
+                                    RestartThread(ref Program.RelayService, FileProcessor);
                                     RestartThread(ref Program.KeyboardProc, KeyboardProcessor);
 
                                     Init(ProgramVersion, true);
@@ -1554,13 +1580,8 @@ namespace SharpENDEC
 
     internal static class Program
     {
-        public const int ReleaseVersion = 1;
-        public const int MinorVersion = 1;
-        public const bool IsCuttingEdge = false;
-        public static string FriendlyVersion = string.Empty;
-
         internal static Thread WatchdogService;
-        internal static Thread CAPService;
+        internal static Thread StreamService;
         internal static Thread RelayService;
         internal static Thread KeyboardProc;
         internal static Thread BatteryProc;
@@ -1568,13 +1589,13 @@ namespace SharpENDEC
         [STAThread]
         private static void Main()
         {
-            if (!IsCuttingEdge)
+            if (!VersionInfo.IsCuttingEdge)
             {
-                FriendlyVersion = $"SharpENDEC {ReleaseVersion}.{MinorVersion} | Release";
+                VersionInfo.FriendlyVersion = $"SharpENDEC {VersionInfo.ReleaseVersion}.{VersionInfo.MinorVersion} | Release";
             }
             else
             {
-                FriendlyVersion = $"SharpENDEC {ReleaseVersion}.{MinorVersion}-c | Cutting Edge (unstable)";
+                VersionInfo.FriendlyVersion = $"SharpENDEC {VersionInfo.ReleaseVersion}.{VersionInfo.MinorVersion}-c | Cutting Edge (unstable)";
             }
             // PLUGIN IMPLEMENTATION!!!
             // BATTERY IMPLEMENTATION!!!
@@ -1587,7 +1608,7 @@ namespace SharpENDEC
         private static void CancelAllOperations(object sender, ConsoleCancelEventArgs e)
         {
             WatchdogService.Abort();
-            CAPService.Abort();
+            StreamService.Abort();
             RelayService.Abort();
             ENDEC.capture.ShutdownCapture = true;
             Console.WriteLine("(-^-)");
@@ -1863,172 +1884,29 @@ namespace SharpENDEC
                     return "Last data received:";
             }
         }
-    }
 
-    public static class SVDictionaryLegacy
-    {
-        private static bool isFrench = false;
-
-        public static bool IsFrench
+        public static string ThreadShutdown(string lang, string name)
         {
-            get => isFrench;
-            set => isFrench = value;
-        }
-
-        public static string RecoveredFromFailure
-        {
-            get => IsFrench
-                ? "Le chien de garde a récemment détecté un problème et a effacé toutes les données XML stockées.\r\n" +
-                "Les alertes précédemment relayées peuvent être relayées à nouveau lorsque le prochain battement de coeur arrive."
-                : "The watchdog has recently detected a problem, and has cleared all XML data stored.\r\n" +
-                "Alerts previously relayed may relay again when the next heartbeat arrives.";
-        }
-        
-        public static string WatchdogForcedRestartWarning
-        {
-            get => IsFrench
-                ? "Cela fait plus de 5 minutes depuis le dernier battement de coeur. Si aucun battement de coeur n'est détecté dans les 5 minutes supplémentaires, le programme redémarrera automatiquement."
-                : "It has been more than 5 minutes since the last heartbeat. If a heartbeat is not detected within 5 additional minutes, the program will automatically restart.";
-        }
-        
-        public static string WatchdogForceRestartingProcess
-        {
-            get => IsFrench
-                ? "Le battement de coeur a été présumé mort. Redémarrage de tous les services dans quelques instants."
-                : "The heartbeat has been presumed dead. Restarting all services in a few moments.";
-        }
-        
-        public static string WatchingFiles
-        {
-            get => IsFrench
-                ? "Surveillance du répertoire pour les alertes."
-                : "Watching directory for alerts.";
-        }
-        
-        public static string HeartbeatDetected
-        {
-            get => IsFrench
-                ? "Battement de coeur détecté."
-                : "Heartbeat detected.";
-        }
-        
-        public static string AlertDetected
-        {
-            get => IsFrench
-                ? "Battement de coeur détecté."
-                : "Alert detected.";
-        }
-        
-        public static string ConnectedToServer(string host, int port)
-        {
-            return IsFrench
-                ? $"Connecté à {host} sur le port {port}."
-                : $"Connected to {host} on port {port}.";
-        }
-        
-        public static string HostTimedOut(string host)
-        {
-            return IsFrench
-                ? $"{host} n'a envoyé aucune donnée dans le délai minimum."
-                : $"{host} hasn't sent any data within the minimum time limit.";
-        }
-        
-        public static string RestartingAfterException
-        {
-            get => IsFrench
-                ? "Le fil de capture est mort de façon inattendue. Il redémarrera automatiquement dans quelques instants."
-                : "The capture thread has died unexpectedly. It will automatically restart in a few moments.";
+            switch (lang)
+            {
+                case "fr":
+                    return $"{name} a été arrêté.";
+                case "en":
+                default:
+                    return $"{name} has been shutdown.";
+            }
         }
 
-        public static string FileDownloaded(string directory, string filename, string host)
+        public static string StartingConnection(string lang, string server, int port)
         {
-            return IsFrench
-                ? $"Fichier enregistré : {directory}\\{filename} | De : {host}"
-                : $"File saved: {directory}\\{filename} | From: {host}";
-        }
-
-        public static string DownloadingFiles
-        {
-            get => IsFrench
-                ? "Téléchargement de fichiers à partir du signal cardiaque reçu."
-                : "Downloading files from received heartbeat.";
-        }
-        
-        public static string FileIgnoredDueToMatchingPair
-        {
-            get => IsFrench
-                ? "Paire correspondante détectée. Ce fichier ne sera pas traité davantage."
-                : "Matching pair detected. This file won't be processed.";
-        }
-
-        public static string FilesIgnoredDueToMatchingPairs(int count)
-        {
-            return IsFrench
-                ? $"{count} fichier(s) avaient des paires correspondantes et n'ont pas été traités."
-                : $"{count} file(s) had matching pairs, and were not processed.";
-        }
-
-        public static string FileIgnoredDueToPreferences
-        {
-            get => IsFrench
-                ? "Les préférences ne permettent pas le relais de cette alerte. Ce fichier ne sera pas traité davantage."
-                : "Preferences do not allow the relay of this alert. This file won't be processed.";
-        }
-        
-        public static string GeneratingProductText
-        {
-            get => IsFrench
-                ? "Génération de texte en cours."
-                : "Generating text.";
-        }
-        
-        public static string GeneratingProductAudio
-        {
-            get => IsFrench
-                ? "Génération audio en cours."
-                : "Generating audio.";
-        }
-        
-        public static string GeneratedProductEmpty
-        {
-            get => IsFrench
-                ? "Il n’y avait rien à générer."
-                : "There was nothing to generate.";
-        }
-        
-        public static string PlayingAudio
-        {
-            get => IsFrench
-                ? "La lecture audio a commencé."
-                : "Audio playback started.";
-        }
-
-        public static string CapturedFromFileWatcher
-        {
-            get => IsFrench
-                ? "File Watcher a capturé un fichier :"
-                : "File Watcher captured a file:";
-        }
-        
-        public static string ProcessingStream
-        {
-            get => IsFrench
-                ? "Flux de données de traitement."
-                : "Processing data stream.";
-        }
-
-        public static string ProcessedStream(int total, DateTime started)
-        {
-            return IsFrench
-                ? $"Traité {total} dans {(DateTime.Now - started).TotalSeconds}s."
-                : $"Processed {total} in {(DateTime.Now - started).TotalSeconds}s.";
-        }
-
-        public static string LastDataReceived
-        {
-            get => IsFrench
-                ? "Dernières données reçues :"
-                : "Last data received:";
+            switch (lang)
+            {
+                case "fr":
+                    return $"Démarrage de la connexion à {server}:{port}.";
+                case "en":
+                default:
+                    return $"Starting connection to {server}:{port}.";
+            }
         }
     }
 }
