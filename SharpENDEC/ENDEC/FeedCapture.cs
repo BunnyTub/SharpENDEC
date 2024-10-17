@@ -62,7 +62,7 @@ namespace SharpENDEC
                                 if (bit != -1)
                                 {
                                     data.Add((byte)bit);
-                                    // The Math.Pow is here to intentionally slow down the stream download,
+                                    // The Math.Pow is here to intentionally slow down the TCP stream download,
                                     // because it's simply too fast, and we can sometimes continue early without it.
                                     Math.Pow(bit, bit);
                                 }
