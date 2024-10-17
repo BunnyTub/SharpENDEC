@@ -95,7 +95,7 @@ namespace SharpENDEC
         {
             //Settings.Default.CurrentLanguage = ((CheckBox)sender).Checked;
             //Settings.Default.Save();
-            //SVDictionary.IsFrench = ((CheckBox)sender).Checked;
+            //LanguageStrings.IsFrench = ((CheckBox)sender).Checked;
         }
 
         private void sTest_CheckedChanged(object sender, EventArgs e)

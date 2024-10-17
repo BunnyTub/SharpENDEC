@@ -11,6 +11,8 @@ namespace SharpENDEC
 {
     public static partial class ENDEC
     {
+        public static List<string> FileStringListTempName = new List<string>();
+
         public class FeedCapture
         {
             public bool ShutdownCapture = false;
@@ -24,7 +26,7 @@ namespace SharpENDEC
                         client.Connect(host, port);
                         NetworkStream stream = client.GetStream();
                         stream.ReadTimeout = 2500;
-                        Console.WriteLine($"[{host}:{port}] {SVDictionary.ConnectedToServer(Settings.Default.CurrentLanguage, host, port)}");
+                        Console.WriteLine($"[{host}:{port}] {LanguageStrings.ConnectedToServer(Settings.Default.CurrentLanguage, host, port)}");
 
                         // FOR DEBUGGING --- REMOVE --- FOR DEBUGGING --- REMOVE
                         //while (true) Check.LastHeartbeat = DateTime.Now;
@@ -38,7 +40,7 @@ namespace SharpENDEC
                         {
                             if (ShutdownCapture)
                             {
-                                Console.WriteLine($"{SVDictionary.ThreadShutdown(Settings.Default.CurrentLanguage, $"Stream Processing ({host}:{port})")}");
+                                Console.WriteLine($"{LanguageStrings.ThreadShutdown(Settings.Default.CurrentLanguage, $"Stream Processing ({host}:{port})")}");
                             }
                             while (!stream.DataAvailable)
                             {
@@ -50,11 +52,11 @@ namespace SharpENDEC
                                 {
                                     return;
                                 }
-                                Thread.Sleep(500);
+                                Thread.Sleep(1000);
                             }
                             data.Clear();
                             DateTime now = DateTime.Now;
-                            Console.WriteLine($"[{host}:{port}] {SVDictionary.ProcessingStream(Settings.Default.CurrentLanguage)}");
+                            Console.WriteLine($"[{host}:{port}] {LanguageStrings.ProcessingStream(Settings.Default.CurrentLanguage)}");
 
                             while (stream.DataAvailable)
                             {
@@ -64,27 +66,27 @@ namespace SharpENDEC
                                     data.Add((byte)bit);
                                     // The Math.Pow is here to intentionally slow down the TCP stream download,
                                     // because it's simply too fast, and we can sometimes continue early without it.
-                                    Math.Pow(bit, bit);
+                                    // Although we may not need it.
+                                    //Math.Pow(bit, bit);
                                 }
                             }
 
-                            Console.WriteLine($"[{host}:{port}] {SVDictionary.ProcessedStream(Settings.Default.CurrentLanguage, data.Count, now)}");
                             string chunk = Encoding.UTF8.GetString(data.ToArray(), 0, data.Count);
 
                             dataReceived += chunk;
 
-                            // dataReceived.StartsWith("<?xml version='1.0' encoding='UTF-8' standalone='no'?>")
-
                             if (chunk.Contains(delimiter))
                             {
+                                Console.WriteLine($"[{host}:{port}] {LanguageStrings.ProcessedStream(Settings.Default.CurrentLanguage, data.Count, now)}");
                                 string capturedSent = Regex.Match(dataReceived, @"<sent>\s*(.*?)\s*</sent>", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Singleline).Groups[1].Value.Replace("-", "_").Replace("+", "p").Replace(":", "_");
                                 string capturedIdent = Regex.Match(dataReceived, @"<identifier>\s*(.*?)\s*</identifier>", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Singleline).Groups[1].Value.Replace("-", "_").Replace("+", "p").Replace(":", "_");
-                                string naadsFilename = $"{capturedSent}I{capturedIdent}.xml";
+                                string naadsFilename = $"{capturedSent}I{capturedIdent}_{rnd.Next(100, 999)}{rnd.Next(100, 999)}.xml";
                                 Directory.CreateDirectory(FileQueueDirectory);
                                 if (!File.Exists($"{FileQueueDirectory}\\{naadsFilename}") && !File.Exists($"{FileHistoryDirectory}\\{naadsFilename}"))
                                 {
                                     File.WriteAllText($"{FileQueueDirectory}\\{naadsFilename}", dataReceived, Encoding.UTF8);
-                                    Console.WriteLine($"[{host}:{port}] {SVDictionary.FileDownloaded(Settings.Default.CurrentLanguage, FileQueueDirectory, naadsFilename, host)}");
+                                    //
+                                    Console.WriteLine($"[{host}:{port}] {LanguageStrings.FileDownloaded(Settings.Default.CurrentLanguage, FileQueueDirectory, naadsFilename, host)}");
                                 }
                                 else
                                 {
@@ -92,17 +94,26 @@ namespace SharpENDEC
                                 }
                                 dataReceived = string.Empty;
                             }
+                            else
+                            {
+                                if (data.Count > 100000000)
+                                {
+                                    Console.WriteLine($"[{host}:{port}] The data exceeds the 100 MB limit. The server may be malfunctioning.");
+                                    return;
+                                }
+                                else Console.WriteLine($"[{host}:{port}] {data.Count} bytes now from the current chunk.");
+                            }
                         }
                     }
                 }
                 catch (TimeoutException)
                 {
-                    Console.WriteLine($"[{host}:{port}] {SVDictionary.HostTimedOut(Settings.Default.CurrentLanguage, host)}");
+                    Console.WriteLine($"[{host}:{port}] {LanguageStrings.HostTimedOut(Settings.Default.CurrentLanguage, host)}");
                     return;
                 }
                 catch (ThreadAbortException)
                 {
-                    Console.WriteLine($"{SVDictionary.ThreadShutdown(Settings.Default.CurrentLanguage, $"Stream Processing ({host}:{port})")}");
+                    Console.WriteLine($"{LanguageStrings.ThreadShutdown(Settings.Default.CurrentLanguage, $"Stream Processing ({host}:{port})")}");
                     return;
                 }
             }
@@ -111,13 +122,19 @@ namespace SharpENDEC
             {
                 List<Thread> ClientThreads = new List<Thread>();
 
-                foreach (string server in Settings.Default.CanadianServers)
+                void StartServerConnection()
                 {
-                    Thread thread = new Thread(() => Receive(server, 8080, "</alert>"));
-                    thread.Start();
-                    ClientThreads.Add(thread);
-                    Console.WriteLine($"{SVDictionary.StartingConnection(Settings.Default.CurrentLanguage, server, 8080)}");
+                    foreach (string server in Settings.Default.CanadianServers)
+                    {
+                        Thread thread = new Thread(() => Receive(server, 8080, "</alert>"));
+                        thread.Start();
+                        ClientThreads.Add(thread);
+                        ColorLine($"{LanguageStrings.StartingConnection(Settings.Default.CurrentLanguage, server, 8080)}", ConsoleColor.DarkGray);
+                        Thread.Sleep(500);
+                    }
                 }
+
+                StartServerConnection();
 
                 try
                 {
@@ -129,7 +146,7 @@ namespace SharpENDEC
                             {
                                 if (!ShutdownCapture)
                                 {
-                                    Console.WriteLine($"{SVDictionary.RestartingAfterException(Settings.Default.CurrentLanguage)}");
+                                    Console.WriteLine($"{LanguageStrings.RestartingAfterException(Settings.Default.CurrentLanguage)}");
                                     string server = Settings.Default.CanadianServers[i];
                                     Thread newThread = new Thread(() => Receive(server, 8080, "</alert>"));
                                     newThread.Start();
@@ -144,7 +161,7 @@ namespace SharpENDEC
                             {
                                 try
                                 {
-                                    thread.Abort();
+                                    if (thread.IsAlive) thread.Join();
                                 }
                                 catch (Exception)
                                 {

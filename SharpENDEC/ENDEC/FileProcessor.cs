@@ -24,17 +24,18 @@ namespace SharpENDEC
                 while (true)
                 {
                     string resultFileName = Check.WatchForFiles();
-                    ColorLine($"[File Processor] {SVDictionary.CapturedFromFileWatcher(Settings.Default.CurrentLanguage)} {resultFileName}", ConsoleColor.Cyan);
-                    if (File.Exists($"{AssemblyDirectory}\\relay.xml")) File.Delete($"{AssemblyDirectory}\\relay.xml");
+                    ColorLine($"[File Processor] {LanguageStrings.CapturedFromFileWatcher(Settings.Default.CurrentLanguage)} {resultFileName}", ConsoleColor.Cyan);
+                    //if (File.Exists($"{AssemblyDirectory}\\relay.xml")) File.Delete($"{AssemblyDirectory}\\relay.xml");
                     WaitForFile($"{FileQueueDirectory}\\{resultFileName}");
-                    File.Move($"{FileQueueDirectory}\\{resultFileName}", $"{AssemblyDirectory}\\relay.xml");
+                    string newFileName = $"relay_{rnd.Next(100, 999)}{rnd.Next(100, 999)}.xml";
+                    File.Move($"{FileQueueDirectory}\\{resultFileName}", $"{AssemblyDirectory}\\{newFileName}");
 
-                    string relayXML = File.ReadAllText("relay.xml", Encoding.UTF8);
+                    string relayData = File.ReadAllText($"{AssemblyDirectory}\\{newFileName}", Encoding.UTF8);
 
-                    if (relayXML.Contains("<sender>NAADS-Heartbeat</sender>"))
+                    if (relayData.Contains("<sender>NAADS-Heartbeat</sender>"))
                     {
-                        ColorLine($"[File Processor] {SVDictionary.HeartbeatDetected(Settings.Default.CurrentLanguage)}", ConsoleColor.Green);
-                        Match referencesMatch = Regex.Match(relayXML, @"<references>\s*(.*?)\s*</references>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                        ColorLine($"[File Processor] {LanguageStrings.HeartbeatDetected(Settings.Default.CurrentLanguage)}", ConsoleColor.Green);
+                        Match referencesMatch = Regex.Match(relayData, @"<references>\s*(.*?)\s*</references>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
                         if (referencesMatch.Success)
                         {
                             string references = referencesMatch.Groups[1].Value;
@@ -45,10 +46,10 @@ namespace SharpENDEC
                     }
                     else
                     {
-                        ColorLine($"[File Processor] {SVDictionary.AlertDetected(Settings.Default.CurrentLanguage)}", ConsoleColor.Green);
-                        File.Move("relay.xml", $"{FileHistoryDirectory}\\{resultFileName}");
+                        ColorLine($"[File Processor] {LanguageStrings.AlertDetected(Settings.Default.CurrentLanguage)}", ConsoleColor.Green);
+                        File.Move($"{AssemblyDirectory}\\{newFileName}", $"{FileHistoryDirectory}\\{resultFileName}_{rnd.Next(100, 999)}{rnd.Next(100, 999)}");
                         bool IsUI = Settings.Default.WirelessAlertMode;
-                        foreach (Match match in Regex.Matches(relayXML, @"<valueName>([^<]+)</valueName>\s*<value>([^<]+)</value>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline))
+                        foreach (Match match in Regex.Matches(relayData, @"<valueName>([^<]+)</valueName>\s*<value>([^<]+)</value>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline))
                         {
                             if (match.Groups[1].Value == "layer:SOREM:2.0:WirelessText")
                             {
@@ -63,18 +64,18 @@ namespace SharpENDEC
                             //Console.WriteLine($"value: {match.Groups[2].Value}");
                         }
 
-                        Match sentMatch = Regex.Match(relayXML, @"<sent>\s*(.*?)\s*</sent>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
-                        Match statusMatch = Regex.Match(relayXML, @"<status>\s*(.*?)\s*</status>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
-                        Match messageTypeMatch = Regex.Match(relayXML, @"<msgType>\s*(.*?)\s*</msgType>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
-                        MatchCollection broadcastImmediatelyMatches = Regex.Matches(relayXML, @"<valueName>layer:SOREM:1.0:Broadcast_Immediately</valueName>\s*<value>\s*(.*?)\s*</value>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
-                        MatchCollection urgencyMatches = Regex.Matches(relayXML, @"<urgency>\s*(.*?)\s*</urgency>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
-                        MatchCollection severityMatches = Regex.Matches(relayXML, @"<severity>\s*(.*?)\s*</severity>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                        Match sentMatch = Regex.Match(relayData, @"<sent>\s*(.*?)\s*</sent>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                        Match statusMatch = Regex.Match(relayData, @"<status>\s*(.*?)\s*</status>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                        Match messageTypeMatch = Regex.Match(relayData, @"<msgType>\s*(.*?)\s*</msgType>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                        MatchCollection broadcastImmediatelyMatches = Regex.Matches(relayData, @"<valueName>layer:SOREM:1.0:Broadcast_Immediately</valueName>\s*<value>\s*(.*?)\s*</value>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                        MatchCollection urgencyMatches = Regex.Matches(relayData, @"<urgency>\s*(.*?)\s*</urgency>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                        MatchCollection severityMatches = Regex.Matches(relayData, @"<severity>\s*(.*?)\s*</severity>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
 
                         bool final = false;
 
                         for (int i = 0; i < severityMatches.Count; i++)
                         {
-                            if (Check.Config(relayXML, statusMatch.Groups[1].Value, messageTypeMatch.Groups[1].Value, severityMatches[i].Groups[1].Value, urgencyMatches[i].Groups[1].Value, broadcastImmediatelyMatches[i].Groups[1].Value))
+                            if (Check.Config(relayData, statusMatch.Groups[1].Value, messageTypeMatch.Groups[1].Value, severityMatches[i].Groups[1].Value, urgencyMatches[i].Groups[1].Value, broadcastImmediatelyMatches[i].Groups[1].Value))
                             {
                                 final = true;
                                 break;
@@ -83,11 +84,11 @@ namespace SharpENDEC
 
                         if (!final)
                         {
-                            Console.WriteLine($"[File Processor] {SVDictionary.FileIgnoredDueToPreferences(Settings.Default.CurrentLanguage)}");
+                            Console.WriteLine($"[File Processor] {LanguageStrings.FileIgnoredDueToPreferences(Settings.Default.CurrentLanguage)}");
                             continue;
                         }
 
-                        MatchCollection infoMatches = Regex.Matches(relayXML, @"<info>\s*(.*?)\s*</info>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                        MatchCollection infoMatches = Regex.Matches(relayData, @"<info>\s*(.*?)\s*</info>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
                         int infoProc = 0;
 
                         foreach (Match infoMatch in infoMatches)
@@ -132,7 +133,7 @@ namespace SharpENDEC
 
                             if (Check.Config(infoEN, statusMatch.Groups[1].Value, MsgType, severity, urgency, broadcastImmediately))
                             {
-                                Console.WriteLine($"[File Processor] {SVDictionary.GeneratingProductText(Settings.Default.CurrentLanguage)}");
+                                Console.WriteLine($"[File Processor] {LanguageStrings.GeneratingProductText(Settings.Default.CurrentLanguage)}");
 
                                 //Console.WriteLine($"0: {messageTypeMatch.Groups[0].Value}");
                                 //Console.WriteLine($"1: {messageTypeMatch.Groups[1].Value}");
@@ -146,7 +147,7 @@ namespace SharpENDEC
 
                                 if (true) //(!string.IsNullOrWhiteSpace(info.BroadcastText))
                                 {
-                                    //Console.WriteLine($"[File Processor] {SVDictionary.GeneratingProductAudio}");
+                                    //Console.WriteLine($"[File Processor] {LanguageStrings.GeneratingProductAudio}");
                                     File.WriteAllText($"{AssemblyDirectory}\\inactive-text.txt", string.Empty);
                                     File.WriteAllText($"{AssemblyDirectory}\\active-text.txt", $"{info.BroadcastText}\x20");
                                     File.WriteAllText($"{AssemblyDirectory}\\static-text.txt", $"{info.BroadcastText}\x20");
@@ -215,7 +216,7 @@ namespace SharpENDEC
                                     }
                                     else
                                     {
-                                        Console.WriteLine($"[File Processor] {SVDictionary.PlayingAudio(Settings.Default.CurrentLanguage)}");
+                                        Console.WriteLine($"[File Processor] {LanguageStrings.PlayingAudio(Settings.Default.CurrentLanguage)}");
                                         Console.WriteLine($"[File Processor] Played {Play($"{AudioDirectory}\\in.wav").AudioLength.TotalMilliseconds} millisecond(s) of audio.");
                                         if (EventInfo.Severity.Contains("Severe") || EventInfo.Severity.Contains("Extreme"))
                                             Console.WriteLine($"[File Processor] Played {Play($"{AudioDirectory}\\attn.wav").AudioLength.TotalMilliseconds} millisecond(s) of audio.");
@@ -237,22 +238,22 @@ namespace SharpENDEC
                                 }
                                 else
                                 {
-                                    Console.WriteLine($"[File Processor] {SVDictionary.GeneratedProductEmpty(Settings.Default.CurrentLanguage)}");
+                                    Console.WriteLine($"[File Processor] {LanguageStrings.GeneratedProductEmpty(Settings.Default.CurrentLanguage)}");
                                 }
                             }
                             else
                             {
-                                Console.WriteLine($"[File Processor] {SVDictionary.FileIgnoredDueToPreferences(Settings.Default.CurrentLanguage)}");
+                                Console.WriteLine($"[File Processor] {LanguageStrings.FileIgnoredDueToPreferences(Settings.Default.CurrentLanguage)}");
                             }
                         }
                     }
 
-                    Console.WriteLine($"[File Processor] {SVDictionary.LastDataReceived(Settings.Default.CurrentLanguage)} {DateTime.Now:yyyy-MM-dd HH:mm:ss}.");
+                    Console.WriteLine($"[File Processor] {LanguageStrings.LastDataReceived(Settings.Default.CurrentLanguage)} {DateTime.Now:yyyy-MM-dd HH:mm:ss}.");
                 }
             }
             catch (ThreadAbortException)
             {
-                Console.WriteLine($"{SVDictionary.ThreadShutdown(Settings.Default.CurrentLanguage, $"File Processor")}");
+                Console.WriteLine($"{LanguageStrings.ThreadShutdown(Settings.Default.CurrentLanguage, $"File Processor")}");
             }
         }
 
@@ -415,7 +416,7 @@ namespace SharpENDEC
 
             public static void Heartbeat(string References)
             {
-                ColorLine($"[Heartbeat] {SVDictionary.DownloadingFiles(Settings.Default.CurrentLanguage)}", ConsoleColor.DarkYellow);
+                ColorLine($"[Heartbeat] {LanguageStrings.DownloadingFiles(Settings.Default.CurrentLanguage)}", ConsoleColor.DarkYellow);
                 string[] RefList = References.Split(' ');
                 int FilesMatched = 0;
                 foreach (string i in RefList)
@@ -431,7 +432,7 @@ namespace SharpENDEC
                     string Dom1 = "capcp1.naad-adna.pelmorex.com";
                     string Dom2 = "capcp2.naad-adna.pelmorex.com";
 
-                    string outputfile = FileQueueDirectory + $"\\{filename}.xml";
+                    string outputFile = FileQueueDirectory + $"\\{filename}.{rnd.Next(100, 999)}{rnd.Next(100, 999)}.xml";
 
                     if (File.Exists(FileHistoryDirectory + $"\\{filename}.xml"))
                     {
@@ -448,8 +449,8 @@ namespace SharpENDEC
                         ColorLine($"-> {url1}", ConsoleColor.Yellow);
                         Task<string> xml = client.GetStringAsync(url1);
                         xml.Wait();
-                        File.WriteAllText(outputfile, xml.Result);
-
+                        if (!File.Exists(outputFile)) File.WriteAllText(outputFile, xml.Result);
+                        else ColorLine("[Heartbeat] There is no need to download an existing file.", ConsoleColor.Yellow);
                         xml.Dispose();
                     }
                     catch (Exception e1)
@@ -461,23 +462,24 @@ namespace SharpENDEC
                             ColorLine($"-> {url2}", ConsoleColor.Yellow);
                             Task<string> xml = client.GetStringAsync(url2);
                             xml.Wait();
-                            File.WriteAllText(outputfile, xml.Result);
+                            if (!File.Exists(outputFile)) File.WriteAllText(outputFile, xml.Result);
+                            else ColorLine("[Heartbeat] There is no need to download an existing file.", ConsoleColor.Yellow);
                             xml.Dispose();
                         }
                         catch (Exception e2)
                         {
                             ColorLine($"[Heartbeat] Stage 2 failed: {e2.Message}", ConsoleColor.Red);
-                            ColorLine($"[Heartbeat] Failed to process the file.", ConsoleColor.Red);
+                            ColorLine($"[Heartbeat] Failed to download the file.", ConsoleColor.Red);
                         }
                     }
                 }
-                if (FilesMatched != 0) ColorLine($"[Heartbeat] {SVDictionary.FilesIgnoredDueToMatchingPairs(Settings.Default.CurrentLanguage, FilesMatched)}", ConsoleColor.Blue);
+                if (FilesMatched != 0) ColorLine($"[Heartbeat] {LanguageStrings.FilesIgnoredDueToMatchingPairs(Settings.Default.CurrentLanguage, FilesMatched)}", ConsoleColor.Blue);
                 LastHeartbeat = DateTime.Now;
             }
 
             public static string WatchForFiles()
             {
-                Console.WriteLine($"[File Processor] {SVDictionary.WatchingFiles(Settings.Default.CurrentLanguage)}");
+                Console.WriteLine($"[File Processor] {LanguageStrings.WatchingFiles(Settings.Default.CurrentLanguage)}");
 
                 while (true)
                 {
@@ -489,7 +491,7 @@ namespace SharpENDEC
                         string fileName = Path.GetFileName(file);
                         if (File.Exists(Path.Combine(FileHistoryDirectory, fileName)))
                         {
-                            ColorLine($"[File Processor] {SVDictionary.FileIgnoredDueToMatchingPair(Settings.Default.CurrentLanguage)}", ConsoleColor.Blue);
+                            ColorLine($"[File Processor] {LanguageStrings.FileIgnoredDueToMatchingPair(Settings.Default.CurrentLanguage)}", ConsoleColor.Blue);
                             File.Delete(file);
                         }
                         else
