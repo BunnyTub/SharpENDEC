@@ -777,7 +777,8 @@ namespace SharpENDEC
             }
         }
 
-        public static bool IsAdministrator => new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator);
+        public static bool IsAdministrator => new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator)
+                                       && WindowsIdentity.GetCurrent().Owner == WindowsIdentity.GetCurrent().User;
         public static bool IsGuest => new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Guest);
 
         /// <summary>
