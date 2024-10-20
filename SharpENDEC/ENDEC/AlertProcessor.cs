@@ -153,33 +153,30 @@ namespace SharpENDEC
 
                         gen.GenerateAudio(info.BroadcastText, lang);
 
-                        if (IsUI)
+                        if (false)
                         {
                             Color BackColor;
                             Color ForeColor;
 
-                            switch (severity)
+                            switch (severity.ToLower())
                             {
-                                case "Extreme":
+                                case "extreme":
                                     BackColor = Color.Red;
                                     ForeColor = Color.Yellow;
                                     break;
-                                case "Severe":
+                                case "severe":
                                     BackColor = Color.OrangeRed;
                                     ForeColor = Color.Black;
                                     break;
-                                case "Moderate":
+                                case "moderate":
                                     BackColor = Color.Gold;
                                     ForeColor = Color.Black;
                                     break;
-                                case "Minor":
+                                case "minor":
                                     BackColor = Color.LightGreen;
                                     ForeColor = Color.Black;
                                     break;
-                                case "Unknown":
-                                    BackColor = Color.White;
-                                    ForeColor = Color.Black;
-                                    break;
+                                case "unknown":
                                 default:
                                     BackColor = Color.White;
                                     ForeColor = Color.Black;

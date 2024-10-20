@@ -388,8 +388,7 @@ namespace SharpENDEC
                                 ConsoleExt.WriteLine($"--- Language ---");
                                 ConsoleExt.WriteLine($"CurrentLanguage = {Settings.Default.CurrentLanguage} | Use the program in a different language");
                                 ConsoleExt.WriteLine($"1. English | Use the program in English");
-                                ConsoleExt.WriteLine($"2. Français | Use the program in English");
-                                ConsoleExt.WriteLine($"3. ᐃᓄᒃᑎᑐᑦ | ᐃᓄᒃᑎᑐᑦ ᐱᓕᕆᐊᒃᓴᒥᒃ ᐊᑐᖅᐸᒡᓗᒋᑦ");
+                                ConsoleExt.WriteLine($"2. Français | Use the program in French");
                                 ConsoleExt.WriteLine();
                                 ConsoleExt.WriteLine($"Press ENTER to finish.");
                                 while (!Console.KeyAvailable) Thread.Sleep(100);
@@ -400,9 +399,6 @@ namespace SharpENDEC
                                         break;
                                     case ConsoleKey.D2:
                                         Settings.Default.CurrentLanguage = "french";
-                                        break;
-                                    case ConsoleKey.D3:
-                                        Settings.Default.CurrentLanguage = "inuktitut";
                                         break;
                                     case ConsoleKey.Enter:
                                         ProgressToNextPage = true;
