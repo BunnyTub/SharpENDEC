@@ -46,7 +46,6 @@ namespace SharpENDEC
                     {
                         lock (SharpAlertQueue) SharpAlertQueue.Add(relayItem);
                         ConsoleExt.WriteLine(LanguageStrings.AlertQueued(Settings.Default.CurrentLanguage));
-                        break;
                     }
 
                     ConsoleExt.WriteLine($"[Data Processor] {LanguageStrings.LastDataReceived(Settings.Default.CurrentLanguage)} {DateTime.Now:yyyy-MM-dd HH:mm:ss}.");
@@ -71,7 +70,7 @@ namespace SharpENDEC
                     if (!DefaultDevice) outputDevice.DeviceNumber = Settings.Default.SoundDevice;
                     outputDevice.Init(audioFile);
                     outputDevice.Play();
-                    ConsoleExt.WriteLine($"[Data Processor] Playing {filePath}.");
+                    ConsoleExt.WriteLine($"[Data Processor] -> {filePath}.");
                     while (outputDevice.PlaybackState == PlaybackState.Playing)
                     {
                         if (SkipPlayback)

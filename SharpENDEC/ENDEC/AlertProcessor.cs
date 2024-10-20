@@ -69,7 +69,7 @@ namespace SharpENDEC
 
             if (!final)
             {
-                ConsoleExt.WriteLine($"[Data Processor] {LanguageStrings.AlertIgnoredDueToPreferences(Settings.Default.CurrentLanguage)}", ConsoleColor.DarkGray);
+                ConsoleExt.WriteLine($"[Alert Processor] {LanguageStrings.AlertIgnoredDueToPreferences(Settings.Default.CurrentLanguage)}", ConsoleColor.DarkGray);
                 return;
             }
 
@@ -79,7 +79,7 @@ namespace SharpENDEC
             foreach (Match infoMatch in infoMatches)
             {
                 infoProc++;
-                ConsoleExt.WriteLine($"[Data Processor] {LanguageStrings.GenericProcessingValueOfValue(Settings.Default.CurrentLanguage, infoProc, infoMatches.Count)}");
+                ConsoleExt.WriteLine($"[Alert Processor] {LanguageStrings.GenericProcessingValueOfValue(Settings.Default.CurrentLanguage, infoProc, infoMatches.Count)}");
                 string infoEN = $"<info>{infoMatch.Groups[1].Value}</info>";
                 string lang = "en";
                 if (Regex.Match(infoEN, @"<language>\s*(.*?)\s*</language>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline).Groups[1].Value == "fr-CA")
@@ -132,28 +132,28 @@ namespace SharpENDEC
 
                     if (Stop)
                     {
-                        ConsoleExt.WriteLine($"[Data Processor] {LanguageStrings.AlertIgnoredDueToBlacklist(Settings.Default.CurrentLanguage)}", ConsoleColor.DarkGray);
+                        ConsoleExt.WriteLine($"[Alert Processor] {LanguageStrings.AlertIgnoredDueToBlacklist(Settings.Default.CurrentLanguage)}", ConsoleColor.DarkGray);
                         continue;
                     }
 
-                    ConsoleExt.WriteLine($"[Data Processor] {LanguageStrings.GeneratingProductText(Settings.Default.CurrentLanguage)}");
+                    ConsoleExt.WriteLine($"[Alert Processor] {LanguageStrings.GeneratingProductText(Settings.Default.CurrentLanguage)}");
 
                     Generate gen = new Generate(infoEN, MsgType, sentMatch.Groups[1].Value);
 
                     var info = gen.BroadcastInfo(lang);
 
-                    if (true) //(!string.IsNullOrWhiteSpace(info.BroadcastText))
+                    //if (true) //(!string.IsNullOrWhiteSpace(info.BroadcastText))
                     {
-                        //ConsoleExt.WriteLine($"[Data Processor] {LanguageStrings.GeneratingProductAudio}");
+                        //ConsoleExt.WriteLine($"[Alert Processor] {LanguageStrings.GeneratingProductAudio}");
                         File.WriteAllText($"{AssemblyDirectory}\\inactive-text.txt", string.Empty);
                         File.WriteAllText($"{AssemblyDirectory}\\active-text.txt", $"{info.BroadcastText}\x20");
                         File.WriteAllText($"{AssemblyDirectory}\\static-text.txt", $"{info.BroadcastText}\x20");
 
-                        ConsoleExt.WriteLine($"[Data Processor] -> {info.BroadcastText}", ConsoleColor.Magenta);
+                        ConsoleExt.WriteLine($"[Alert Processor] -> {info.BroadcastText}", ConsoleColor.Magenta);
 
                         gen.GenerateAudio(info.BroadcastText, lang);
 
-                        if (false)
+                        if (IsUI)
                         {
                             Color BackColor;
                             Color ForeColor;
@@ -208,36 +208,37 @@ namespace SharpENDEC
                         }
                         else
                         {
-                            ConsoleExt.WriteLine($"[Data Processor] {LanguageStrings.PlayingAudio(Settings.Default.CurrentLanguage)}");
-                            ConsoleExt.WriteLine($"[Data Processor] Played {Play($"{AudioDirectory}\\in.wav").AudioLength.TotalMilliseconds} millisecond(s) of audio.");
+                            ConsoleExt.WriteLine($"[Alert Processor] {LanguageStrings.PlayingAudio(Settings.Default.CurrentLanguage)}");
+                            ConsoleExt.WriteLine($"[Alert Processor] {Play($"{AudioDirectory}\\in.wav").AudioLength.TotalMilliseconds} millisecond(s) played");
                             if (EventInfo.Severity.Contains("Severe") || EventInfo.Severity.Contains("Extreme"))
-                                ConsoleExt.WriteLine($"[Data Processor] Played {Play($"{AudioDirectory}\\attn.wav").AudioLength.TotalMilliseconds} millisecond(s) of audio.");
+                                ConsoleExt.WriteLine($"[Alert Processor] {Play($"{AudioDirectory}\\attn.wav").AudioLength.TotalMilliseconds} millisecond(s) played.");
                             else
                             {
                                 var (FilePlayed, AudioLength) = Play($"{AudioDirectory}\\attn-minor.wav");
                                 if (FilePlayed)
-                                    ConsoleExt.WriteLine($"[Data Processor] Played {Play($"{AudioDirectory}\\attn-minor.wav").AudioLength.TotalMilliseconds} millisecond(s) of audio.");
+                                    ConsoleExt.WriteLine($"[Alert Processor] {Play($"{AudioDirectory}\\attn-minor.wav").AudioLength.TotalMilliseconds} millisecond(s) played.");
                                 else
-                                    ConsoleExt.WriteLine($"[Data Processor] Played {Play($"{AudioDirectory}\\attn.wav").AudioLength.TotalMilliseconds} millisecond(s) of audio.");
+                                    ConsoleExt.WriteLine($"[Alert Processor] {Play($"{AudioDirectory}\\attn.wav").AudioLength.TotalMilliseconds} millisecond(s) played.");
                             }
-                            //ConsoleExt.WriteLine($"[Data Processor] Attention tone not played because the alert severity is not severe or extreme.");
-                            ConsoleExt.WriteLine($"[Data Processor] Played {Play($"{AudioDirectory}\\audio.wav").AudioLength.TotalMilliseconds} millisecond(s) of audio.");
-                            ConsoleExt.WriteLine($"[Data Processor] Played {Play($"{AudioDirectory}\\out.wav").AudioLength.TotalMilliseconds} millisecond(s) of audio.");
+                            //ConsoleExt.WriteLine($"[Alert Processor] Attention tone not played because the alert severity is not severe or extreme.");
+                            ConsoleExt.WriteLine($"[Alert Processor] {Play($"{AudioDirectory}\\audio.wav").AudioLength.TotalMilliseconds} millisecond(s) played.");
+                            ConsoleExt.WriteLine($"[Alert Processor] {Play($"{AudioDirectory}\\out.wav").AudioLength.TotalMilliseconds} millisecond(s) played.");
                         }
 
                         File.WriteAllText($"{AssemblyDirectory}\\active-text.txt", string.Empty);
                         File.WriteAllText($"{AssemblyDirectory}\\inactive-text.txt", $"{info.BroadcastText}\x20");
                     }
-                    else
-                    {
-                        ConsoleExt.WriteLine($"[Data Processor] {LanguageStrings.GeneratedProductEmpty(Settings.Default.CurrentLanguage)}");
-                    }
+                    //else
+                    //{
+                    //    ConsoleExt.WriteLine($"[Alert Processor] {LanguageStrings.GeneratedProductEmpty(Settings.Default.CurrentLanguage)}");
+                    //}
                 }
                 else
                 {
-                    ConsoleExt.WriteLine($"[Data Processor] {LanguageStrings.AlertIgnoredDueToPreferences(Settings.Default.CurrentLanguage)}", ConsoleColor.DarkGray);
+                    ConsoleExt.WriteLine($"[Alert Processor] {LanguageStrings.AlertIgnoredDueToPreferences(Settings.Default.CurrentLanguage)}", ConsoleColor.DarkGray);
                 }
             }
+            //ConsoleExt.WriteLine("[Alert Processor] Processed all available entries.", ConsoleColor.DarkGray);
         }
     }
 }

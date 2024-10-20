@@ -12,9 +12,9 @@ namespace SharpENDEC
         public const string BuiltOnDate = "";
         public const string BuiltOnTime = "";
         public const string BuiltTimeZone = "";
-        public static readonly int ReleaseVersion = 1;
-        public static readonly int MinorVersion = 2;
-        public static readonly bool IsCuttingEdge = true;
+        public static readonly int ReleaseVersion = 2;
+        public static readonly int MinorVersion = 0;
+        public static readonly bool IsCuttingEdge = false;
         public static string FriendlyVersion
         {
             get
