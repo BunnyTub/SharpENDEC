@@ -1,4 +1,6 @@
-﻿namespace SharpENDEC
+﻿using System.Diagnostics;
+
+namespace SharpENDEC
 {
     public static class VersionInfoTemplate
     {
@@ -6,6 +8,7 @@
         // You can change the release, minor, and cutting edge variables.
         // ---
         // Do not change consts!
+        public const int BuildNumber = 0;
         public const string BuiltOnDate = "";
         public const string BuiltOnTime = "";
         public const string BuiltTimeZone = "";
@@ -18,11 +21,13 @@
             {
                 if (!IsCuttingEdge)
                 {
-                    return $"SharpENDEC | Release {ReleaseVersion}.{MinorVersion} | Built on {BuiltOnDate} {BuiltOnTime} ({BuiltTimeZone})";
+                    return $"SharpENDEC | Release {ReleaseVersion}.{MinorVersion} (Build {BuildNumber}) | Built on {BuiltOnDate} {BuiltOnTime} ({BuiltTimeZone})";
                 }
                 else
                 {
-                    return $"SharpENDEC | Cutting Edge {ReleaseVersion}.{MinorVersion}-c | Built on {BuiltOnDate} {BuiltOnTime} ({BuiltTimeZone})";
+                    if (Debugger.IsAttached) return $"SharpENDEC | Cutting Edge {ReleaseVersion}.{MinorVersion}-c (Build {BuildNumber}) | Built on {BuiltOnDate} {BuiltOnTime} ({BuiltTimeZone})";
+                    else return $"SharpENDEC | Cutting Edge {ReleaseVersion}.{MinorVersion}-c (Build {BuildNumber}) | Built on {BuiltOnDate} {BuiltOnTime} ({BuiltTimeZone})\r\n" +
+                            $"Debugger Attached | Is Logging: {Debugger.IsLogging()}";
                 }
             }
         }

@@ -20,21 +20,21 @@ namespace SharpENDEC
 
                         if (!(powerStatus.BatteryLifePercent > 0.20))
                         {
-                            Console.WriteLine($"[Battery] The battery percentage is currently at {powerStatus.BatteryLifePercent}.");
+                            ConsoleExt.WriteLine($"[Battery] The battery percentage is currently at {powerStatus.BatteryLifePercent}.");
                         }
-                        Console.WriteLine($"Battery Status: {chargeStatus}");
+                        ConsoleExt.WriteLine($"Battery Status: {chargeStatus}");
 
                         if ((chargeStatus & BatteryChargeStatus.Charging) == BatteryChargeStatus.Charging)
                         {
-                            Console.WriteLine("The system is currently charging.");
+                            ConsoleExt.WriteLine("The system is currently charging.");
                         }
                         else if (chargeStatus == BatteryChargeStatus.NoSystemBattery)
                         {
-                            Console.WriteLine("No battery is installed.");
+                            ConsoleExt.WriteLine("No battery is installed.");
                         }
                         else
                         {
-                            Console.WriteLine("The system is not charging.");
+                            ConsoleExt.WriteLine("The system is not charging.");
                         }
                     }
                     catch (Exception)

@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -11,7 +12,20 @@ namespace SharpENDEC
 {
     public static partial class ENDEC
     {
-        public static List<string> FileStringListTempName = new List<string>();
+        public static List<SharpDataItem> SharpDataQueue = new List<SharpDataItem>();
+        public static List<SharpDataItem> SharpDataHistory = new List<SharpDataItem>();
+
+        public class SharpDataItem
+        {
+            public string Name { get; set; }
+            public string Data { get; set; }
+
+            public SharpDataItem(string name, string data)
+            {
+                Name = name;
+                Data = data;
+            }
+        }
 
         public class FeedCapture
         {
@@ -26,7 +40,7 @@ namespace SharpENDEC
                         client.Connect(host, port);
                         NetworkStream stream = client.GetStream();
                         stream.ReadTimeout = 2500;
-                        Console.WriteLine($"[{host}:{port}] {LanguageStrings.ConnectedToServer(Settings.Default.CurrentLanguage, host, port)}");
+                        ConsoleExt.WriteLine($"[{host}:{port}] {LanguageStrings.ConnectedToServer(Settings.Default.CurrentLanguage, host, port)}", ConsoleColor.Green);
 
                         // FOR DEBUGGING --- REMOVE --- FOR DEBUGGING --- REMOVE
                         //while (true) Check.LastHeartbeat = DateTime.Now;
@@ -40,7 +54,7 @@ namespace SharpENDEC
                         {
                             if (ShutdownCapture)
                             {
-                                Console.WriteLine($"{LanguageStrings.ThreadShutdown(Settings.Default.CurrentLanguage, $"Stream Processing ({host}:{port})")}");
+                                ConsoleExt.WriteLine($"{LanguageStrings.ThreadShutdown(Settings.Default.CurrentLanguage, $"Stream Processing ({host}:{port})")}");
                             }
                             while (!stream.DataAvailable)
                             {
@@ -48,15 +62,16 @@ namespace SharpENDEC
                                 {
                                     stream.WriteByte(0);
                                 }
-                                catch (IOException)
+                                catch (IOException e)
                                 {
+                                    ConsoleExt.WriteLine($"[{host}:{port}] {e.Message}", ConsoleColor.Red);
                                     return;
                                 }
                                 Thread.Sleep(1000);
                             }
                             data.Clear();
                             DateTime now = DateTime.Now;
-                            Console.WriteLine($"[{host}:{port}] {LanguageStrings.ProcessingStream(Settings.Default.CurrentLanguage)}");
+                            ConsoleExt.WriteLine($"[{host}:{port}] {LanguageStrings.ProcessingStream(Settings.Default.CurrentLanguage)}");
 
                             while (stream.DataAvailable)
                             {
@@ -77,50 +92,56 @@ namespace SharpENDEC
 
                             if (chunk.Contains(delimiter))
                             {
-                                Console.WriteLine($"[{host}:{port}] {LanguageStrings.ProcessedStream(Settings.Default.CurrentLanguage, data.Count, now)}");
+                                ConsoleExt.WriteLine($"[{host}:{port}] {LanguageStrings.ProcessedStream(Settings.Default.CurrentLanguage, data.Count, now)}");
                                 string capturedSent = Regex.Match(dataReceived, @"<sent>\s*(.*?)\s*</sent>", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Singleline).Groups[1].Value.Replace("-", "_").Replace("+", "p").Replace(":", "_");
                                 string capturedIdent = Regex.Match(dataReceived, @"<identifier>\s*(.*?)\s*</identifier>", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Singleline).Groups[1].Value.Replace("-", "_").Replace("+", "p").Replace(":", "_");
-                                string naadsFilename = $"{capturedSent}I{capturedIdent}_{rnd.Next(100, 999)}{rnd.Next(100, 999)}.xml";
-                                Directory.CreateDirectory(FileQueueDirectory);
-                                if (!File.Exists($"{FileQueueDirectory}\\{naadsFilename}") && !File.Exists($"{FileHistoryDirectory}\\{naadsFilename}"))
+                                string filename = $"{capturedSent}I{capturedIdent}.xml";
+
+                                if (SharpDataQueue.Any(x => x.Name == filename) || SharpDataHistory.Any(x => x.Name == filename))
                                 {
-                                    File.WriteAllText($"{FileQueueDirectory}\\{naadsFilename}", dataReceived, Encoding.UTF8);
-                                    //
-                                    Console.WriteLine($"[{host}:{port}] {LanguageStrings.FileDownloaded(Settings.Default.CurrentLanguage, FileQueueDirectory, naadsFilename, host)}");
+                                    ConsoleExt.WriteLine($"[{host}:{port}] {LanguageStrings.DataPreviouslyProcessed(Settings.Default.CurrentLanguage)}", ConsoleColor.DarkGray);
                                 }
                                 else
                                 {
-                                    Console.WriteLine($"[{host}:{port}] The file has already been downloaded and/or processed.");
+                                    SharpDataQueue.Add(new SharpDataItem(filename, dataReceived));
+                                    ConsoleExt.WriteLine($"[{host}:{port}] {LanguageStrings.FileDownloaded(Settings.Default.CurrentLanguage, host)}");
                                 }
                                 dataReceived = string.Empty;
                             }
                             else
                             {
-                                if (data.Count > 100000000)
+                                if (data.Count > 10000000)
                                 {
-                                    Console.WriteLine($"[{host}:{port}] The data exceeds the 100 MB limit. The server may be malfunctioning.");
-                                    return;
+                                    throw new Exception($"[{host}:{port}] The data exceeds the 10 MB limit. The server may be malfunctioning.");
                                 }
-                                else Console.WriteLine($"[{host}:{port}] {data.Count} bytes now from the current chunk.");
+                                else ConsoleExt.WriteLine($"[{host}:{port}] {data.Count} bytes total including the current chunk.");
                             }
                         }
                     }
                 }
+                catch (SocketException e)
+                {
+                    ConsoleExt.WriteLine($"[{host}:{port}] {e.Message}");
+                    Thread.Sleep(1000);
+                    return;
+                }
                 catch (TimeoutException)
                 {
-                    Console.WriteLine($"[{host}:{port}] {LanguageStrings.HostTimedOut(Settings.Default.CurrentLanguage, host)}");
+                    ConsoleExt.WriteLine($"[{host}:{port}] {LanguageStrings.HostTimedOut(Settings.Default.CurrentLanguage, host)}");
                     return;
                 }
                 catch (ThreadAbortException)
                 {
-                    Console.WriteLine($"{LanguageStrings.ThreadShutdown(Settings.Default.CurrentLanguage, $"Stream Processing ({host}:{port})")}");
+                    ShutdownCapture = true;
+                    //ConsoleExt.WriteLine($"{LanguageStrings.ThreadShutdown(Settings.Default.CurrentLanguage, $"Stream Processing ({host}:{port})")}");
                     return;
                 }
             }
 
             public bool Main()
             {
-                List<Thread> ClientThreads = new List<Thread>();
+                SharpDataQueue = new List<SharpDataItem>();
+                SharpDataHistory = new List<SharpDataItem>();
 
                 void StartServerConnection()
                 {
@@ -129,8 +150,8 @@ namespace SharpENDEC
                         Thread thread = new Thread(() => Receive(server, 8080, "</alert>"));
                         thread.Start();
                         ClientThreads.Add(thread);
-                        ColorLine($"{LanguageStrings.StartingConnection(Settings.Default.CurrentLanguage, server, 8080)}", ConsoleColor.DarkGray);
-                        Thread.Sleep(500);
+                        ConsoleExt.WriteLine($"{LanguageStrings.StartingConnection(Settings.Default.CurrentLanguage, server, 8080)}", ConsoleColor.DarkGray);
+                        Thread.Sleep(250);
                     }
                 }
 
@@ -146,7 +167,7 @@ namespace SharpENDEC
                             {
                                 if (!ShutdownCapture)
                                 {
-                                    Console.WriteLine($"{LanguageStrings.RestartingAfterException(Settings.Default.CurrentLanguage)}");
+                                    ConsoleExt.WriteLine($"{LanguageStrings.RestartingAfterException(Settings.Default.CurrentLanguage)}");
                                     string server = Settings.Default.CanadianServers[i];
                                     Thread newThread = new Thread(() => Receive(server, 8080, "</alert>"));
                                     newThread.Start();
@@ -157,6 +178,7 @@ namespace SharpENDEC
 
                         if (ShutdownCapture)
                         {
+                            lock (ClientThreads)
                             foreach (var thread in ClientThreads)
                             {
                                 try

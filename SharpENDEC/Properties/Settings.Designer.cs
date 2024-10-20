@@ -13,7 +13,7 @@ namespace SharpENDEC.Properties {
     
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.Editors.SettingsDesigner.SettingsSingleFileGenerator", "17.9.0.0")]
-    internal sealed partial class Settings : global::System.Configuration.ApplicationSettingsBase {
+    public sealed partial class Settings : global::System.Configuration.ApplicationSettingsBase {
         
         private static Settings defaultInstance = ((Settings)(global::System.Configuration.ApplicationSettingsBase.Synchronized(new Settings())));
         
@@ -133,7 +133,7 @@ namespace SharpENDEC.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
         public bool severityMinor {
             get {
                 return ((bool)(this["severityMinor"]));
@@ -145,7 +145,7 @@ namespace SharpENDEC.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
         public bool severityUnknown {
             get {
                 return ((bool)(this["severityUnknown"]));
@@ -218,7 +218,7 @@ namespace SharpENDEC.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("en")]
+        [global::System.Configuration.DefaultSettingValueAttribute("english")]
         public string CurrentLanguage {
             get {
                 return ((string)(this["CurrentLanguage"]));
@@ -242,7 +242,7 @@ namespace SharpENDEC.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("Tom")]
+        [global::System.Configuration.DefaultSettingValueAttribute("Ava")]
         public string SpeechVoice {
             get {
                 return ((string)(this["SpeechVoice"]));
@@ -289,6 +289,31 @@ namespace SharpENDEC.Properties {
             }
             set {
                 this["CanadianServers"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("120")]
+        public int EnforceMaximumTime {
+            get {
+                return ((int)(this["EnforceMaximumTime"]));
+            }
+            set {
+                this["EnforceMaximumTime"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("<?xml version=\"1.0\" encoding=\"utf-16\"?>\r\n<ArrayOfString xmlns:xsd=\"http://www.w3." +
+            "org/2001/XMLSchema\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" />")]
+        public global::System.Collections.Specialized.StringCollection EnforceEventBlacklist {
+            get {
+                return ((global::System.Collections.Specialized.StringCollection)(this["EnforceEventBlacklist"]));
+            }
+            set {
+                this["EnforceEventBlacklist"] = value;
             }
         }
     }

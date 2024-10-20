@@ -30,10 +30,10 @@
       <Value Profile="(Default)">True</Value>
     </Setting>
     <Setting Name="severityMinor" Type="System.Boolean" Scope="User">
-      <Value Profile="(Default)">False</Value>
+      <Value Profile="(Default)">True</Value>
     </Setting>
     <Setting Name="severityUnknown" Type="System.Boolean" Scope="User">
-      <Value Profile="(Default)">False</Value>
+      <Value Profile="(Default)">True</Value>
     </Setting>
     <Setting Name="urgencyImmediate" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
@@ -52,13 +52,13 @@
 &lt;ArrayOfString xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" /&gt;</Value>
     </Setting>
     <Setting Name="CurrentLanguage" Type="System.String" Scope="User">
-      <Value Profile="(Default)">en</Value>
+      <Value Profile="(Default)">english</Value>
     </Setting>
     <Setting Name="SoundDevice" Type="System.Int32" Scope="User">
       <Value Profile="(Default)">-1</Value>
     </Setting>
     <Setting Name="SpeechVoice" Type="System.String" Scope="User">
-      <Value Profile="(Default)">Tom</Value>
+      <Value Profile="(Default)">Ava</Value>
     </Setting>
     <Setting Name="WirelessAlertMode" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
@@ -72,6 +72,13 @@
   &lt;string&gt;streaming1.naad-adna.pelmorex.com&lt;/string&gt;
   &lt;string&gt;streaming2.naad-adna.pelmorex.com&lt;/string&gt;
 &lt;/ArrayOfString&gt;</Value>
+    </Setting>
+    <Setting Name="EnforceMaximumTime" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">120</Value>
+    </Setting>
+    <Setting Name="EnforceEventBlacklist" Type="System.Collections.Specialized.StringCollection" Scope="User">
+      <Value Profile="(Default)">&lt;?xml version="1.0" encoding="utf-16"?&gt;
+&lt;ArrayOfString xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" /&gt;</Value>
     </Setting>
   </Settings>
 </SettingsFile>
