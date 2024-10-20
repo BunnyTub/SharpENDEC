@@ -35,9 +35,13 @@ Here's something, configurations! You might want to change some default settings
 Audio can be added and changed easily! Simply add in files and swap as you please.
 
 ```in.wav``` This sound is used as the lead-in, and is played before all other sounds. It will simply be ignored if it does not exist.
+
 ```attn.wav``` This sound is used as the attention tone for alerts marked as severe and above. The built-in copy will be extracted if it does not exist.
+
 ```attn-minor.wav``` This sound is used as the attention tone for alerts marked as minor and below. It will fallback to **attn.wav** if it does not exist.
+
 ```audio.wav``` This sound is reserved for the program's internal use. Modifying the file should not have any effect, and will be overwritten.
+
 ```out.wav``` This sound is used as the lead-out, and is played after all other sounds. It will simply be ignored if it does not exist.
 
 ### Is there anything else I need to know?
