@@ -31,6 +31,8 @@ Well, you don't have to. But you should! There's a lot of stuff that could be of
 
 Here's something, configurations! You might want to change some default settings, especially if they don't fit for your scenario. If you want to change your settings, press ```C``` during startup. To reset them to factory defaults, press ```R``` instead. I'll let you explore them for yourself! Although... if you can't find any CAP-GP geocodes for use in filtering, you can use [this Excel spreadsheet](https://www.publicsafety.gc.ca/cnt/rsrcs/pblctns/capcp-lctn-rfrncs/capcp-lctn-rfrncs-annex-a-201708.xlsx), which contains the most recent list of geocodes.
 
+One last thing. If you want to grab the text produced for use in automation, you can use ```static-text.txt``` if you need the newest text. If you want the file to be empty when it is inactive, use ```active-text.txt```. For the opposite, you can use ```inactive-text.txt``` instead.
+
 ## How can I change the audio?
 Audio can be added and changed easily! Simply add in files and swap as you please.
 
