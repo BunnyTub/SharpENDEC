@@ -181,14 +181,24 @@ namespace SharpENDEC
             }
         }
 
+        public static string AlertInvalid(string lang)
+        {
+            switch (lang)
+            {
+                case "french":
+                    return "Cette alerte n'est pas valide et ne peut pas être traitée.";
+                case "english":
+                default:
+                    return "This alert is invalid and cannot be processed.";
+            }
+        }
+
         public static string AlertIgnoredDueToPreferences(string lang)
         {
             switch (lang)
             {
                 case "french":
                     return "Cette alerte ne sera pas traitée en raison des préférences de l'utilisateur.";
-                case "inuktitut":
-                    return "ᑖᓐᓇ ᖃᐅᔨᓴᕈᑎ ᐱᓕᕆᐊᖑᔾᔮᙱᑦᑐᖅ ᐊᑐᖅᑎᑦ ᓂᕈᐊᕆᔭᖏᑦ ᐱᔾᔪᑎᒋᓪᓗᒋᑦ.";
                 case "english":
                 default:
                     return "This alert won't be processed due to the user preferences.";
@@ -354,14 +364,12 @@ namespace SharpENDEC
             switch (lang)
             {
                 case "french":
-                    return $"Vous perdrez probablement votre configuration parce que vous utilisez un compte invité." +
+                    return $"Vous perdrez probablement votre configuration parce que vous utilisez un compte invité.\r\n" +
                         $"S’il vous plaît exécuter SharpENDEC sous un utilisateur normal pour garder votre configuration !";
-                case "inuktitut":
-                    return "";
                 case "english":
                 default:
-                    return $"ᐋᖅᑭᒃᓯᒪᓂᕆᔭᐃᑦ ᐊᓯᐅᔨᑐᐃᓐᓇᕆᐊᖃᖅᑕᑦ ᓲᖃᐃᒻᒪ ᐊᑐᕋᕕᑦ ᖃᐃᖁᔭᐅᓯᒪᔪᒥᒃ ᓇᓕᖅᑲᒥᒃ.\r\n" +
-                        $"SharpENDEC-ᑯᑦ ᐃᖏᕐᕋᑎᖃᑦᑕᕐᓂᐊᖅᐸᑎᑦ ᐊᑐᒐᔪᒃᑕᒃᑯᑦ ᐋᖅᑭᒃᓯᒪᓂᕆᔭᐃᑦᑏᓐᓇᕋᓱᒡᓗᒍ!";
+                    return $"You will lose your configuration because you are using a guest account.\r\n" +
+                        $"Please run SharpENDEC under a normal user to keep your configuration!";
             }
         }
 
@@ -371,8 +379,6 @@ namespace SharpENDEC
             {
                 case "french":
                     return "Les données ont été ignorées car elles se trouvaient déjà dans la file d’attente ou dans l’historique.";
-                case "inuktitut":
-                    return "ᑖᒃᑯᐊ ᑎᑎᕋᖅᓯᒪᔪᑦ ᐲᖅᑕᐅᑐᐃᓐᓇᓚᐅᖅᑐᑦ ᐱᔾᔪᑎᒋᓪᓗᒍ ᐱᑕᖃᕇᕐᒪᑦ ᐅᕝᕙᓘᓐᓃᑦ ᐅᐊᑦᑎᐊᕈᓐᓂᓴᕐᓂᒃ.";
                 case "english":
                 default:
                     return "The data was skipped because it's already in either the queue or history.";
@@ -385,8 +391,6 @@ namespace SharpENDEC
             {
                 case "french":
                     return $"Traitement {x} de {y}.";
-                case "inuktitut":
-                    return $"ᐱᓕᕆᐊᖃᕐᓂᖅ {x} ᑲᑎᖦᖢᒋᑦ {y}.";
                 case "english":
                 default:
                     return $"Processing {x} of {y}.";
@@ -400,8 +404,6 @@ namespace SharpENDEC
             {
                 case "french":
                     return $"Impossible de télécharger le fichier.";
-                case "inuktitut":
-                    return $"ᒥᓇᕆᙱᑕᖓ ᑎᑎᖅᑲᖓ.";
                 case "english":
                 default:
                     return $"Failed to download the file.";
@@ -414,11 +416,21 @@ namespace SharpENDEC
             {
                 case "french":
                     return "Cette alerte ne sera pas traitée en raison de la liste noire.";
-                case "inuktitut":
-                    return "ᑖᓐᓇ ᖃᐅᔨᓴᕈᑎ ᐱᓕᕆᐊᖑᔾᔮᙱᑦᑐᖅ ᕿᕐᓂᖅᑕᒧᑦ.";
                 case "english":
                 default:
-                    return "This alert won't be processed due to the blacklist.";
+                    return "This alert won't be processed further due to the blacklist.";
+            }
+        }
+
+        public static string AlertIgnoredDueToExpiry(string lang)
+        {
+            switch (lang)
+            {
+                case "french":
+                    return "Cette alerte ne sera plus traitée parce qu'elle a expiré.";
+                case "english":
+                default:
+                    return "This alert won't be processed further because it has expired.";
             }
         }
     }

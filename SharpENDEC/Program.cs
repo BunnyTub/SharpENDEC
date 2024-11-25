@@ -3,10 +3,13 @@ using SharpENDEC.Properties;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Management;
 using System.Reflection;
 using System.Security.Principal;
 using System.Speech.Synthesis;
 using System.Threading;
+using System.Windows.Forms;
 using static SharpENDEC.VersionInfo;
 
 namespace SharpENDEC
@@ -70,15 +73,15 @@ namespace SharpENDEC
 
             if (!File.Exists($"{AudioDirectory}\\attn.wav"))
             {
+                ConsoleExt.WriteLine("The attention tone audio \"attn.wav\" doesn't exist. The default one will be used instead.");
                 MemoryStream mem = new MemoryStream();
                 Resources.attn.CopyTo(mem);
                 File.WriteAllBytes("Audio\\attn.wav", mem.ToArray());
                 mem.Dispose();
-                ConsoleExt.WriteLine("The attention tone audio \"attn.wav\" doesn't exist. The default one will be used instead.");
             }
 
             //ConsoleExt.WriteLine();
-            ConsoleExt.WriteLine($"Press SPACE to pause for 30 seconds.");
+            ConsoleExt.WriteLine($"Press SPACE to pause for 15 seconds.");
 
             bool alreadyPaused = false;
 
@@ -92,8 +95,8 @@ namespace SharpENDEC
                     switch (Console.ReadKey(true).Key)
                     {
                         case ConsoleKey.Spacebar:
-                            ConsoleExt.WriteLine("Paused for 30 seconds.");
-                            Thread.Sleep(30000);
+                            ConsoleExt.WriteLine("Paused for 15 seconds.");
+                            Thread.Sleep(15000);
                             alreadyPaused = true;
                             continue;
                     }
@@ -471,37 +474,9 @@ namespace SharpENDEC
         }
 
         public static FeedCapture Capture;
-        public static List<Thread> ClientThreads = new List<Thread>();
+        public static List<Thread> CaptureThreads = new List<Thread>();
 
-        //public static Thread MethodToThread(Action method)
-        //{
-        //    return new Thread(() =>
-        //    {
-        //        try
-        //        {
-        //            method();
-        //        }
-        //        catch (ThreadAbortException ex)
-        //        {
-        //            ConsoleExt.WriteLine($"Shutdown caught in thread: {ex.Message}");
-        //            File.AppendAllText($"{AssemblyDirectory}\\exception.log",
-        //                $"{DateTime.Now:G} | Shutdown in {method.Method.Name}\r\n" +
-        //                $"{ex.StackTrace}\r\n" +
-        //                $"{ex.Source}\r\n" +
-        //                $"{ex.Message}\r\n");
-        //        }
-        //        catch (Exception ex)
-        //        {
-        //            ConsoleExt.WriteLine($"Exception caught in thread: {ex.Message}");
-        //            File.AppendAllText($"{AssemblyDirectory}\\exception.log",
-        //                $"{DateTime.Now:G} | Exception in {method.Method.Name}\r\n" +
-        //                $"{ex.StackTrace}\r\n" +
-        //                $"{ex.Source}\r\n" +
-        //                $"{ex.Message}\r\n");
-        //        }
-        //    });
-        //}
-
+        [STAThread]
         public static void KeyboardProcessor()
         {
             //try
@@ -541,12 +516,94 @@ namespace SharpENDEC
                                 SkipPlayback = true;
                                 ConsoleExt.WriteLine("Audio playback has been disabled for this time only.");
                                 break;
+                            case ConsoleKey.O:
+                                OpenFileDialog AlertFileDialog = new OpenFileDialog
+                                {
+                                    //InitialDirectory = "C:\\",
+                                    Filter = "CAP files (*.xml, *.cap)|*.xml;*.cap",
+                                    FilterIndex = 0,
+                                    CheckFileExists = true,
+                                    Multiselect = false
+                                };
+                                //AlertFileDialog.RestoreDirectory = true;
+
+                                ConsoleExt.WriteLine("Opening file picker.");
+
+                                if (AlertFileDialog.ShowDialog() != DialogResult.OK)
+                                {
+                                    ConsoleExt.WriteLine("No file chosen.");
+                                    break;
+                                }
+
+                                try
+                                {
+                                    string data = File.ReadAllText(AlertFileDialog.FileName);
+                                    lock (SharpDataQueue)
+                                        SharpDataQueue.Add(new SharpDataItem(AlertFileDialog.SafeFileName, data));
+                                    ConsoleExt.WriteLine("Added file to queue.");
+                                }
+                                catch (Exception e)
+                                {
+                                    ConsoleExt.WriteLineErr(e.Message);
+                                }
+                                finally
+                                {
+                                    AlertFileDialog.Dispose();
+                                }
+
+                                break;
+
                             //case ConsoleKey.G:
                             //    ConsoleExt.WriteLine("GUI shown.");
                             //    break;
                         }
                     }
                     Thread.Sleep(100);
+                }
+            }
+        }
+
+        public static void BatteryProcessor()
+        {
+            // if (Battery.UsageEnabled) then DoBatteryStuff
+            //try
+            {
+                while (true)
+                {
+                    try
+                    {
+                        foreach (ManagementObject battery in new ManagementObjectSearcher("Select * from Win32_Battery")
+                            .Get()
+                            .Cast<ManagementObject>())
+                        {
+                            string name = battery["Name"]?.ToString();
+                            string status = battery["Status"]?.ToString();
+                            int estimatedChargeRemaining = Convert.ToInt32(battery["EstimatedChargeRemaining"]);
+                            int estimatedRunTime = Convert.ToInt32(battery["EstimatedRunTime"]);
+
+                            Console.WriteLine($"Battery Name: {name}");
+                            Console.WriteLine($"Status: {status}");
+                            Console.WriteLine($"Charge Remaining: {estimatedChargeRemaining}%");
+
+                            // Estimated run time in minutes, -1 means unknown
+                            if (estimatedRunTime != -1)
+                            {
+                                Console.WriteLine($"Estimated Run Time: {TimeSpan.FromMinutes(estimatedRunTime)}");
+                            }
+                            else
+                            {
+                                Console.WriteLine("Estimated Run Time: Unknown");
+                            }
+
+                            Console.WriteLine("------------------------------------------------");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"An error occurred: {ex.Message}");
+                    }
+                    //Thread.Sleep(10000);
+                    Thread.Sleep(1000);
                 }
             }
         }
@@ -559,6 +616,7 @@ namespace SharpENDEC
                 catch (ThreadAbortException) { }
                 catch (Exception e) { MainExt.UnsafeStateShutdown(null, e, e.Message); }
             });
+            thread.SetApartmentState(ApartmentState.STA);
             Program.MainThreads.Add((thread, method));
             thread.Start();
         }
@@ -593,66 +651,82 @@ namespace SharpENDEC
             }
         }
 
+        //public static IEnumerable<Type> handlers = AppDomain.CurrentDomain.GetAssemblies().SelectMany(s => s.GetTypes())
+        //        .Where(p => typeof(ISharpPlugin).IsAssignableFrom(p) && p.IsClass);
+
         public static Thread Watchdog()
         {
             return new Thread(() =>
             {
-                string ProgramVersion = FriendlyVersion;
-                Init(ProgramVersion, false);
-
-                void ShutdownCapture()
+                try
                 {
-                    if (Capture != null)
+                    string ProgramVersion = FriendlyVersion;
+                    Init(ProgramVersion, false);
+
+                    void ShutdownCapture()
                     {
-                        Capture.ShutdownCapture = true;
-                        while (Capture.ShutdownCapture)
+                        if (Capture != null)
                         {
-                            Thread.Sleep(500);
+                            Capture.ShutdownCapture = true;
+                            while (Capture.ShutdownCapture)
+                            {
+                                Thread.Sleep(500);
+                            }
                         }
+                        ConsoleExt.WriteLine($"{LanguageStrings.ThreadShutdown(Settings.Default.CurrentLanguage, $"Data Processor")}");
                     }
-                    ConsoleExt.WriteLine($"{LanguageStrings.ThreadShutdown(Settings.Default.CurrentLanguage, $"Data Processor")}");
-                }
 
-                Config();
+                    Config();
 
-                while (true)
-                {
-                    Check.LastHeartbeat = DateTime.Now;
-
-                    //if (!Program.MainThreads.Contains(Thread.CurrentThread)) Program.MainThreads.Add(Thread.CurrentThread);
-
-                    AddThread(StreamProcessor);
-                    AddThread(DataProcessor);
-                    AddThread(AlertProcessor);
-                    AddThread(KeyboardProcessor);
+                    //foreach (var handler in handlers)
+                    //{
+                    //    var handlerInstance = (ISharpPlugin)Activator.CreateInstance(handler);
+                    //    //handlerInstance.AlertBlacklisted();
+                    //}
 
                     while (true)
                     {
-                        if ((DateTime.Now - Check.LastHeartbeat).TotalMinutes >= 5)
-                        {
-                            if ((DateTime.Now - Check.LastHeartbeat).TotalMinutes >= 10)
-                            {
-                                ConsoleExt.WriteLine($"[Watchdog] {LanguageStrings.WatchdogForceRestartingProcess(Settings.Default.CurrentLanguage)}", ConsoleColor.Red);
+                        //if (!Program.MainThreads.Contains(Thread.CurrentThread)) Program.MainThreads.Add(Thread.CurrentThread);
 
-                                try
+                        AddThread(StreamProcessor);
+                        AddThread(DataProcessor);
+                        AddThread(AlertProcessor);
+                        AddThread(KeyboardProcessor);
+                        //AddThread(BatteryProcessor);
+                        AddThread(HTTPServerProcessor);
+
+                        Check.LastHeartbeat = DateTime.Now;
+
+                        while (true)
+                        {
+                            if ((DateTime.Now - Check.LastHeartbeat).TotalMinutes >= 5)
+                            {
+                                if ((DateTime.Now - Check.LastHeartbeat).TotalMinutes >= 10)
                                 {
-                                    ShutdownCapture();
-                                    RestartAllThreads();
-                                    Init(ProgramVersion, true);
-                                    Thread.Sleep(5000);
+                                    ConsoleExt.WriteLine($"[Watchdog] {LanguageStrings.WatchdogForceRestartingProcess(Settings.Default.CurrentLanguage)}", ConsoleColor.Red);
+
+                                    try
+                                    {
+                                        ShutdownCapture();
+                                        RestartAllThreads();
+                                        Init(ProgramVersion, true);
+                                        Thread.Sleep(5000);
+                                    }
+                                    catch (Exception)
+                                    {
+
+                                    }
+
+                                    break;
                                 }
-                                catch (Exception)
-                                {
-                                    
-                                }
-                                
-                                break;
+                                //else ConsoleExt.WriteLine($"[Watchdog] {LanguageStrings.WatchdogForcedRestartWarning(Settings.Default.CurrentLanguage)}", ConsoleColor.Red);
                             }
-                            //else ConsoleExt.WriteLine($"[Watchdog] {LanguageStrings.WatchdogForcedRestartWarning(Settings.Default.CurrentLanguage)}", ConsoleColor.Red);
+                            Thread.Sleep(5000);
                         }
-                        Thread.Sleep(5000);
                     }
                 }
+                catch (ThreadAbortException) { }
+                catch (Exception e) { MainExt.UnsafeStateShutdown(null, e, e.Message); }
             });
         }
     }
@@ -660,10 +734,6 @@ namespace SharpENDEC
     internal static class Program
     {
         internal static Thread WatchdogService;
-        //internal static Thread StreamService;
-        //internal static Thread RelayService;
-        //internal static Thread KeyboardProc;
-        //internal static Thread BatteryProc;
         internal static List<(Thread, ThreadStart)> MainThreads = new List<(Thread, ThreadStart)>();
 
         [STAThread]
@@ -671,19 +741,20 @@ namespace SharpENDEC
         {
             Console.Title = "SharpENDEC";
             Console.ForegroundColor = ConsoleColor.White;
-            // PLUGIN IMPLEMENTATION!!!
-            // BATTERY IMPLEMENTATION!!!
-            // GUI IMPLEMENTATION!!!
+            // PLUGIN IMPLEMENTATION!!! - CANCELLED
+            // BATTERY IMPLEMENTATION!!! - BUSY
+            // GUI IMPLEMENTATION!!! - BUSY
             //Thread thread = new Thread(() => new ConsoleForm().ShowDialog());
             //thread.Start();
+            Thread thread = new Thread(() => new SideloadData().ShowDialog());
+            thread.Start();
             WatchdogService = ENDEC.Watchdog();
             WatchdogService.Start();
-            Console.CancelKeyPress += CancelAllOperations;
+            //Console.CancelKeyPress += CancelAllOperations;
         }
 
-        private static void CancelAllOperations(object sender, ConsoleCancelEventArgs e)
-        {
-
-        }
+        //private static void CancelAllOperations(object sender, ConsoleCancelEventArgs e)
+        //{
+        //}
     }
 }
