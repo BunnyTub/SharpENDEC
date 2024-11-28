@@ -19,7 +19,7 @@ Newtonsoft.Json
 > Although SharpENDEC is meant to replicate an ENDEC, it is **not** meant to be a complete ENDEC replacement.
 > Physical hardware is usually more stable, and more capable in terms of processing.
 
-[Join our official Discord server!](https://discord.gg/qQQqF52jhT)
+[Join the EAS Culture Discord server!](https://discord.gg/qQQqF52jhT)
 
 ## What is it anyway?
 SharpENDEC is a Canadian software CAP (Common Alerting Protocol) receiver for alerting.
