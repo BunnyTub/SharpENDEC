@@ -2,12 +2,19 @@
 using SharpENDEC.Properties;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
+using System.Linq;
+using System.Management;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Speech.Synthesis;
 using System.Threading;
+using System.Windows.Forms;
 using static SharpENDEC.VersionInfo;
+using ThreadState = System.Threading.ThreadState;
 
 namespace SharpENDEC
 {
@@ -55,12 +62,16 @@ namespace SharpENDEC
         /// </summary>
         public static void Init(string VersionID, bool RecoveredFromProblem)
         {
-            Console.Title = VersionID;
+            EnablePerformanceProcessor = false;
+            Console.Title = VersionID + " | *";
+            EnablePerformanceProcessor = true;
+
             ConsoleExt.WriteLine($"{VersionID}\r\n" +
-                $"Source code forked from QuantumENDEC 4.\r\n\r\n" +
+                $"This project wouldn't have been possible without ApatheticDELL's QuantumENDEC!\r\n\r\n" +
                 $"Project created by BunnyTub.\r\n" +
                 $"Logo created by ApatheticDELL.\r\n" +
-                $"Translations may not be 100% accurate due to language deviations.\r\n");
+                $"Translations may not be 100% accurate due to language deviations.\r\n" +
+                $"Translations are not fully complete, and may be undone.\r\n");
 
             if (RecoveredFromProblem) ConsoleExt.WriteLine(LanguageStrings.RecoveredFromFailure(Settings.Default.CurrentLanguage), ConsoleColor.DarkRed);
             if (IsAdministrator) ConsoleExt.WriteLine(LanguageStrings.ElevationSecurityProblem(Settings.Default.CurrentLanguage), ConsoleColor.Yellow);
@@ -70,15 +81,15 @@ namespace SharpENDEC
 
             if (!File.Exists($"{AudioDirectory}\\attn.wav"))
             {
+                ConsoleExt.WriteLine("The attention tone audio \"attn.wav\" doesn't exist. The default one will be extracted and used instead.");
                 MemoryStream mem = new MemoryStream();
                 Resources.attn.CopyTo(mem);
                 File.WriteAllBytes("Audio\\attn.wav", mem.ToArray());
                 mem.Dispose();
-                ConsoleExt.WriteLine("The attention tone audio \"attn.wav\" doesn't exist. The default one will be used instead.");
             }
 
             //ConsoleExt.WriteLine();
-            ConsoleExt.WriteLine($"Press SPACE to pause for 30 seconds.");
+            ConsoleExt.WriteLine($"Press SPACE to pause for 15 seconds.");
 
             bool alreadyPaused = false;
 
@@ -92,8 +103,8 @@ namespace SharpENDEC
                     switch (Console.ReadKey(true).Key)
                     {
                         case ConsoleKey.Spacebar:
-                            ConsoleExt.WriteLine("Paused for 30 seconds.");
-                            Thread.Sleep(30000);
+                            ConsoleExt.WriteLine("Paused for 15 seconds.");
+                            Thread.Sleep(15000);
                             alreadyPaused = true;
                             continue;
                     }
@@ -471,36 +482,7 @@ namespace SharpENDEC
         }
 
         public static FeedCapture Capture;
-        public static List<Thread> ClientThreads = new List<Thread>();
-
-        //public static Thread MethodToThread(Action method)
-        //{
-        //    return new Thread(() =>
-        //    {
-        //        try
-        //        {
-        //            method();
-        //        }
-        //        catch (ThreadAbortException ex)
-        //        {
-        //            ConsoleExt.WriteLine($"Shutdown caught in thread: {ex.Message}");
-        //            File.AppendAllText($"{AssemblyDirectory}\\exception.log",
-        //                $"{DateTime.Now:G} | Shutdown in {method.Method.Name}\r\n" +
-        //                $"{ex.StackTrace}\r\n" +
-        //                $"{ex.Source}\r\n" +
-        //                $"{ex.Message}\r\n");
-        //        }
-        //        catch (Exception ex)
-        //        {
-        //            ConsoleExt.WriteLine($"Exception caught in thread: {ex.Message}");
-        //            File.AppendAllText($"{AssemblyDirectory}\\exception.log",
-        //                $"{DateTime.Now:G} | Exception in {method.Method.Name}\r\n" +
-        //                $"{ex.StackTrace}\r\n" +
-        //                $"{ex.Source}\r\n" +
-        //                $"{ex.Message}\r\n");
-        //        }
-        //    });
-        //}
+        public static List<Thread> CaptureThreads = new List<Thread>();
 
         public static void KeyboardProcessor()
         {
@@ -541,6 +523,43 @@ namespace SharpENDEC
                                 SkipPlayback = true;
                                 ConsoleExt.WriteLine("Audio playback has been disabled for this time only.");
                                 break;
+                            case ConsoleKey.O:
+                                OpenFileDialog AlertFileDialog = new OpenFileDialog
+                                {
+                                    //InitialDirectory = "C:\\",
+                                    Filter = "CAP files (*.xml, *.cap)|*.xml;*.cap",
+                                    FilterIndex = 0,
+                                    CheckFileExists = true,
+                                    Multiselect = false
+                                };
+                                //AlertFileDialog.RestoreDirectory = true;
+
+                                ConsoleExt.WriteLine("Opening file picker.");
+
+                                if (AlertFileDialog.ShowDialog() != DialogResult.OK)
+                                {
+                                    ConsoleExt.WriteLine("No file chosen.");
+                                    break;
+                                }
+
+                                try
+                                {
+                                    string data = File.ReadAllText(AlertFileDialog.FileName);
+                                    lock (SharpDataQueue)
+                                        SharpDataQueue.Add(new SharpDataItem(AlertFileDialog.SafeFileName, data));
+                                    ConsoleExt.WriteLine("Added file to queue.");
+                                }
+                                catch (Exception e)
+                                {
+                                    ConsoleExt.WriteLineErr(e.Message);
+                                }
+                                finally
+                                {
+                                    AlertFileDialog.Dispose();
+                                }
+
+                                break;
+
                             //case ConsoleKey.G:
                             //    ConsoleExt.WriteLine("GUI shown.");
                             //    break;
@@ -551,7 +570,70 @@ namespace SharpENDEC
             }
         }
 
-        public static void AddThread(ThreadStart method)
+        public static bool EnablePerformanceProcessor = false;
+
+        public static void TitleProcessor()
+        {
+            string originalTitle = Console.Title;
+            Process thisProcess = Process.GetCurrentProcess();
+            PerformanceCounter cpuCounter;
+            cpuCounter = new PerformanceCounter("Processor", "% Processor Time", "_Total");
+
+            while (true)
+            {
+                if (EnablePerformanceProcessor)
+                {
+                    Console.Title = originalTitle.Replace("*", $"{cpuCounter.NextValue() / Environment.ProcessorCount:0.00}% CPU - {thisProcess.WorkingSet64 / (1024 * 1024)} MB");
+                    thisProcess.Refresh();
+                }
+                Thread.Sleep(1000);
+            }
+        }
+
+        public static void BatteryProcessor()
+        {
+            // if (Battery.UsageEnabled) then DoBatteryStuff
+            //try
+            {
+                while (true)
+                {
+                    try
+                    {
+                        foreach (ManagementObject battery in new ManagementObjectSearcher("Select * from Win32_Battery")
+                            .Get()
+                            .Cast<ManagementObject>())
+                        {
+                            string name = battery["Name"]?.ToString();
+                            string status = battery["Status"]?.ToString();
+                            int estimatedChargeRemaining = Convert.ToInt32(battery["EstimatedChargeRemaining"]);
+                            int estimatedRunTime = Convert.ToInt32(battery["EstimatedRunTime"]);
+
+                            Console.WriteLine($"Battery Name: {name}");
+                            Console.WriteLine($"Status: {status}");
+                            Console.WriteLine($"Charge Remaining: {estimatedChargeRemaining}%");
+
+                            // Estimated run time in minutes, -1 means unknown
+                            if (estimatedRunTime != -1)
+                            {
+                                Console.WriteLine($"Estimated Run Time: {TimeSpan.FromMinutes(estimatedRunTime)}");
+                            }
+                            else
+                            {
+                                Console.WriteLine("Estimated Run Time: Unknown");
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"An error occurred: {ex.Message}");
+                    }
+                    //Thread.Sleep(10000);
+                    Thread.Sleep(1000);
+                }
+            }
+        }
+
+        public static Thread AddThread(ThreadStart method, bool isMTA)
         {
             Thread thread = new Thread(() =>
             {
@@ -559,19 +641,43 @@ namespace SharpENDEC
                 catch (ThreadAbortException) { }
                 catch (Exception e) { MainExt.UnsafeStateShutdown(null, e, e.Message); }
             });
-            Program.MainThreads.Add((thread, method));
+            if (isMTA) thread.SetApartmentState(ApartmentState.MTA);
+            else thread.SetApartmentState(ApartmentState.STA);
+            Program.MainThreads.Add((thread, method, isMTA));
             thread.Start();
+            return thread;
         }
 
+        public static void KillAllThreads()
+        {
+            var threadList = new List<Thread>();
+            foreach (var (thread, _, _) in Program.MainThreads)
+            {
+                threadList.Add(thread);
+            }
+            Program.MainThreads.Clear();
+            foreach (var thread in threadList)
+            {
+                thread.Abort();
+            }
+        }
+        
         public static void RestartAllThreads()
         {
-            foreach (var (thread, method) in Program.MainThreads)
+            var threadList = new List<(Thread thread, ThreadStart method, bool isMTA)>();
+            foreach (var (thread, method, isMTA) in Program.MainThreads)
             {
-                RestartThread(thread, method);
+                threadList.Add((thread, method, isMTA));
+                RestartThread(thread, method, isMTA);
+            }
+            Program.MainThreads.Clear();
+            foreach (var (thread, method, isMTA) in threadList)
+            {
+                Program.MainThreads.Add((thread, method, isMTA));
             }
         }
 
-        public static void RestartThread(Thread serviceThread, ThreadStart method)
+        public static void RestartThread(Thread serviceThread, ThreadStart method, bool IsMTAThread)
         {
             if (serviceThread != null)
             {
@@ -579,55 +685,102 @@ namespace SharpENDEC
                     serviceThread.Abort();
             }
 
-            Thread newThread = new Thread(method);
-            newThread.Start();
+            Thread thread = new Thread(() =>
+            {
+                try { method(); }
+                catch (ThreadAbortException) { }
+                catch (Exception e) { MainExt.UnsafeStateShutdown(null, e, e.Message); }
+            });
+            if (IsMTAThread) thread.SetApartmentState(ApartmentState.MTA);
+            else thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
 
-            int index = Program.MainThreads.IndexOf((serviceThread, method));
-            if (index >= 0)
-            {
-                Program.MainThreads[index] = (newThread, method);
-            }
-            else
-            {
-                Program.MainThreads.Add((newThread, method));
-            }
+            //int index = Program.MainThreads.IndexOf((serviceThread, method));
+            //if (index >= 0)
+            //{
+            //    Program.MainThreads[index] = (newThread, method);
+            //}
+            //else
+            //{
+            //    Program.MainThreads.Add((newThread, method));
+            //}
         }
+
+        //public static IEnumerable<Type> handlers = AppDomain.CurrentDomain.GetAssemblies().SelectMany(s => s.GetTypes())
+        //        .Where(p => typeof(ISharpPlugin).IsAssignableFrom(p) && p.IsClass);
 
         public static Thread Watchdog()
         {
             return new Thread(() =>
             {
-                string ProgramVersion = FriendlyVersion;
-                Init(ProgramVersion, false);
-
-                void ShutdownCapture()
+                try
                 {
-                    if (Capture != null)
+                    string ProgramVersion = FriendlyVersion;
+                    Init(ProgramVersion, false);
+
+                    void ShutdownCapture()
                     {
-                        Capture.ShutdownCapture = true;
-                        while (Capture.ShutdownCapture)
+                        if (Capture != null)
                         {
-                            Thread.Sleep(500);
+                            Capture.ShutdownCapture = true;
+                            while (Capture.ShutdownCapture)
+                            {
+                                Thread.Sleep(500);
+                            }
                         }
+                        ConsoleExt.WriteLine($"{LanguageStrings.ThreadShutdown(Settings.Default.CurrentLanguage, $"Data Processor")}");
                     }
-                    ConsoleExt.WriteLine($"{LanguageStrings.ThreadShutdown(Settings.Default.CurrentLanguage, $"Data Processor")}");
-                }
 
-                Config();
+                    Config();
 
-                while (true)
-                {
-                    Check.LastHeartbeat = DateTime.Now;
+                    //foreach (var handler in handlers)
+                    //{
+                    //    var handlerInstance = (ISharpPlugin)Activator.CreateInstance(handler);
+                    //    //handlerInstance.AlertBlacklisted();
+                    //}
+
+#if !DEBUG
+                    Process parent;
+
+                    try
+                    {
+                        var myId = Process.GetCurrentProcess().Id;
+                        var search = new ManagementObjectSearcher("root\\CIMV2",
+                            $"SELECT ParentProcessId FROM Win32_Process WHERE ProcessId = {Process.GetCurrentProcess().Id}");
+                        var results = search.Get().GetEnumerator();
+                        results.MoveNext();
+                        parent = Process.GetProcessById((int)(uint)results.Current["ParentProcessId"]);
+                    }
+                    catch (Exception)
+                    {
+                        ConsoleExt.WriteLine("Process is malfunctioning.");
+                        return;
+                    }
+#endif
 
                     //if (!Program.MainThreads.Contains(Thread.CurrentThread)) Program.MainThreads.Add(Thread.CurrentThread);
 
-                    AddThread(StreamProcessor);
-                    AddThread(DataProcessor);
-                    AddThread(AlertProcessor);
-                    AddThread(KeyboardProcessor);
+                    AddThread(StreamProcessor, true);
+                    AddThread(DataProcessor, true);
+                    AddThread(AlertProcessor, true);
+                    AddThread(KeyboardProcessor, false);
+                    AddThread(TitleProcessor, true);
+                    //AddThread(BatteryProcessor);
+                    AddThread(HTTPServerProcessor, true);
+
+                    Check.LastHeartbeat = DateTime.Now;
 
                     while (true)
                     {
+#if !DEBUG
+                        if (parent.HasExited)
+                        {
+                            ShutdownCapture();
+                            KillAllThreads();
+                            Environment.Exit(1985);
+                        }
+#endif
+
                         if ((DateTime.Now - Check.LastHeartbeat).TotalMinutes >= 5)
                         {
                             if ((DateTime.Now - Check.LastHeartbeat).TotalMinutes >= 10)
@@ -643,9 +796,9 @@ namespace SharpENDEC
                                 }
                                 catch (Exception)
                                 {
-                                    
+
                                 }
-                                
+
                                 break;
                             }
                             //else ConsoleExt.WriteLine($"[Watchdog] {LanguageStrings.WatchdogForcedRestartWarning(Settings.Default.CurrentLanguage)}", ConsoleColor.Red);
@@ -653,6 +806,8 @@ namespace SharpENDEC
                         Thread.Sleep(5000);
                     }
                 }
+                catch (ThreadAbortException) { }
+                catch (Exception e) { MainExt.UnsafeStateShutdown(null, e, e.Message); }
             });
         }
     }
@@ -660,30 +815,103 @@ namespace SharpENDEC
     internal static class Program
     {
         internal static Thread WatchdogService;
-        //internal static Thread StreamService;
-        //internal static Thread RelayService;
-        //internal static Thread KeyboardProc;
-        //internal static Thread BatteryProc;
-        internal static List<(Thread, ThreadStart)> MainThreads = new List<(Thread, ThreadStart)>();
+        internal static List<(Thread, ThreadStart, bool)> MainThreads = new List<(Thread, ThreadStart, bool)>();
+        internal const uint ENABLE_QUICK_EDIT = 0x0040;
+        internal const uint ENABLE_EXTENDED_FLAGS = 0x0080;
+        public const int STD_INPUT_HANDLE = -10;
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        internal static extern IntPtr GetStdHandle(int nStdHandle);
+
+        [DllImport("kernel32.dll")]
+        internal static extern bool GetConsoleMode(IntPtr hConsoleHandle, out uint lpMode);
+
+        [DllImport("kernel32.dll")]
+        internal static extern bool SetConsoleMode(IntPtr hConsoleHandle, uint dwMode);
 
         [STAThread]
-        internal static void Main()
+        internal static void Main(string[] args)
         {
             Console.Title = "SharpENDEC";
             Console.ForegroundColor = ConsoleColor.White;
-            // PLUGIN IMPLEMENTATION!!!
-            // BATTERY IMPLEMENTATION!!!
-            // GUI IMPLEMENTATION!!!
-            //Thread thread = new Thread(() => new ConsoleForm().ShowDialog());
-            //thread.Start();
-            WatchdogService = ENDEC.Watchdog();
-            WatchdogService.Start();
-            Console.CancelKeyPress += CancelAllOperations;
+
+#if !DEBUG
+            string WatchdogArgument = "--redundant-watchdog";
+
+            if (args.Length == 1)
+            {
+                if (args[0] == WatchdogArgument)
+                {
+#endif
+                    DisableConsoleHighlighting();
+                    // BATTERY IMPLEMENTATION!!! - BUSY
+                    // GUI IMPLEMENTATION!!! - UNKNOWN / BUSY
+                    WatchdogService = ENDEC.Watchdog();
+                    WatchdogService.Start();
+#if !DEBUG
+                }
+            }
+            else
+            {
+                bool restart = false;
+
+                do
+                {
+                    using (var p = new Process
+                    {
+                        StartInfo = new ProcessStartInfo(Assembly.GetExecutingAssembly().Location)
+                        {
+                            Arguments = WatchdogArgument,
+                            UseShellExecute = false
+                        }
+                    })
+                    {
+                        p.Start();
+                        p.WaitForExit();
+
+                        if (p.ExitCode == 1984)
+                        {
+                            restart = true;
+                        }
+                        else
+                        {
+                            restart = false;
+                        }
+                    }
+                } while (restart);
+            }
+#endif
         }
 
-        private static void CancelAllOperations(object sender, ConsoleCancelEventArgs e)
+        internal static bool DisableConsoleHighlighting()
         {
+            IntPtr consoleHandle = GetStdHandle(STD_INPUT_HANDLE);
 
+            if (!GetConsoleMode(consoleHandle, out uint mode))
+            {
+                var MarshalException = new Win32Exception(unchecked(Marshal.GetLastWin32Error()));
+                ConsoleExt.WriteLineErr($"Could not get the console mode. This may cause problems if you select text often.\r\n" +
+                    $"You can ignore this message if you're not running Windows 10 or above.\r\n" +
+                    $"Reason: {MarshalException.Message}");
+                Thread.Sleep(5000);
+                return false;
+            }
+
+            mode &= ~ENABLE_QUICK_EDIT;
+            mode |= ENABLE_EXTENDED_FLAGS;
+
+            if (!SetConsoleMode(consoleHandle, mode))
+            {
+                var MarshalException = new Win32Exception(unchecked(Marshal.GetLastWin32Error()));
+                ConsoleExt.WriteLineErr($"Could not set the console mode. This may cause problems if you select text often.\r\n" +
+                    $"You can ignore this message if you're not running Windows 10 or above.\r\n" +
+                    $"Reason: {MarshalException.Message}");
+                Thread.Sleep(5000);
+                return false;
+            }
+
+            // if we don't use unchecked(), the error might cause an error
+            return true;
         }
     }
 }

@@ -1,6 +1,4 @@
-﻿using System.Diagnostics;
-
-namespace SharpENDEC
+﻿namespace SharpENDEC
 {
     public static class VersionInfoTemplate
     {
@@ -12,7 +10,7 @@ namespace SharpENDEC
         public const string BuiltOnDate = "";
         public const string BuiltOnTime = "";
         public const string BuiltTimeZone = "";
-        public static readonly int ReleaseVersion = 2;
+        public static readonly int ReleaseVersion = 3;
         public static readonly int MinorVersion = 0;
         public static readonly bool IsCuttingEdge = false;
         public static string FriendlyVersion
@@ -25,9 +23,7 @@ namespace SharpENDEC
                 }
                 else
                 {
-                    if (Debugger.IsAttached) return $"SharpENDEC | Cutting Edge {ReleaseVersion}.{MinorVersion}-c (Build {BuildNumber}) | Built on {BuiltOnDate} {BuiltOnTime} ({BuiltTimeZone})";
-                    else return $"SharpENDEC | Cutting Edge {ReleaseVersion}.{MinorVersion}-c (Build {BuildNumber}) | Built on {BuiltOnDate} {BuiltOnTime} ({BuiltTimeZone})\r\n" +
-                            $"Debugger Attached | Is Logging: {Debugger.IsLogging()}";
+                    return $"SharpENDEC | Cutting Edge {ReleaseVersion}.{MinorVersion}-c (Build {BuildNumber}) | Built on {BuiltOnDate} {BuiltOnTime} ({BuiltTimeZone})";
                 }
             }
         }

@@ -1,14 +1,15 @@
 ﻿using System;
-using System.Diagnostics;
+using System.Collections.Generic;
+using System.IO;
+using System.Reflection;
+using System.Security.Cryptography;
 using System.Threading;
-using System.Threading.Tasks;
-using ThreadState = System.Threading.ThreadState;
 
 namespace SharpENDEC
 {
     public static class MainExt
     {
-        private static Exception ex = new Exception();
+        public static Exception LastException { get; private set; }
 
         /// <summary>
         /// This method is for dummy purposes, and does not perform any tasks.
@@ -22,7 +23,7 @@ namespace SharpENDEC
         /// </summary>
         public static Exception UnknownException()
         {
-            return new Exception("DummyException");
+            return new Exception("UnknownException");
         }
 
         /// <summary>
@@ -31,51 +32,75 @@ namespace SharpENDEC
         /// <param name="caller">The method that called the exception.</param>
         /// <param name="exception">The exception that caused the unsafe state.</param>
         /// <param name="reason">The reason why the unsafe state was invoked.</param>
-        /// <param name="restart">Whether or not to restart and ignore the infinite rule.</param>
+        /// <param name="restart">Whether or not to restart and ignore the infinite wait rule.</param>
         public static void UnsafeStateShutdown(Action caller, Exception exception, string reason, bool restart = true)
         {
-            lock (ex)
+            LastException = exception;
+            lock (LastException)
             {
                 if (caller.IsNull()) caller = UnknownCaller;
                 if (exception.IsNull()) exception = UnknownException();
                 if (string.IsNullOrEmpty(reason)) reason = "No reason provided.";
 
-                ex = exception;
+                try { if (!Program.WatchdogService.IsNull()) Program.WatchdogService.Abort(LastException); } catch (Exception) { }
 
-                lock (ENDEC.ClientThreads)
+                DateTime ExceptionTime = DateTime.Now;
+
+                lock (ENDEC.CaptureThreads)
                 {
-                    foreach (Thread thread in ENDEC.ClientThreads)
-                        try { if (!thread.IsNull()) thread.Abort(ex); } catch (Exception) { }
-                    ENDEC.ClientThreads.Clear();
+                    foreach (Thread thread in ENDEC.CaptureThreads)
+                        try { if (!thread.IsNull()) thread.Abort(LastException); } catch (Exception) { }
+                    ENDEC.CaptureThreads.Clear();
                 }
 
                 lock (Program.MainThreads)
                 {
-                    foreach (var (thread, method) in Program.MainThreads)
-                        try { if (!thread.IsNull()) thread.Abort(ex); } catch (Exception) { }
+                    foreach (var (thread, method, isMTA) in Program.MainThreads)
+                        try { if (!thread.IsNull()) thread.Abort(LastException); } catch (Exception) { }
                     Program.MainThreads.Clear();
                 }
 
                 ENDEC.Capture = null;
+                ENDEC.SharpDataQueue = null;
+                ENDEC.SharpDataHistory = null;
+
+                Thread.Sleep(100);
 
                 Console.Clear();
                 Console.ForegroundColor = ConsoleColor.DarkRed;
-                string full = ($"{DateTime.Now:G} | Called by {caller.Method.Name}\r\n" +
-                    $"Stack Trace: {ex.StackTrace}\r\n" +
-                    $"Source: {ex.Source}\r\n" +
-                    $"Message: {ex.Message}\r\n" +
-                    $"{reason}");
+                string full = $"{ExceptionTime:G} | Called by {caller.Method.Name}\r\n" +
+                    $"Exception Stack Trace: {LastException.StackTrace}\r\n" +
+                    $"Exception Source: {LastException.Source}\r\n" +
+                    $"Exception Message: {LastException.Message}\r\n" +
+                    $"Caller Reason: {reason}";
                 Console.WriteLine(full);
-                Thread.Sleep(1000);
+                try
+                {
+                    string ExceptionDateTime = ExceptionTime.ToString("s").Replace(":", "-");
+                    File.WriteAllText(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) + $"\\exception_{ExceptionDateTime}.txt", full + "\r\n");
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine($"Another exception occurred while trying to write an exception.\r\n{e.Message}");
+                }
+#if DEBUG
                 Debug.Assert(false, "The program went into an unsafe state.", full);
-                Console.Clear();
+#else
+                Thread.Sleep(5000);
+#endif
                 if (restart)
                 {
                     Console.Clear();
-                    new Thread(() => Program.Main()).Start();
+#if !DEBUG
+                    Environment.Exit(1984);
+#else
+                    new Thread(() => Program.Main(null)).Start();
+#endif
                 }
-                else Thread.Sleep(Timeout.Infinite);
-
+                else
+                {
+                    Environment.Exit(1985);
+                }
             }
         }
 
@@ -83,6 +108,57 @@ namespace SharpENDEC
         {
             if (obj == null) return true;
             return false;
+        }
+        
+        public static string ListToString(this List<string> obj)
+        {
+            if (obj == null) return string.Empty;
+            if (obj.Count == 0) return string.Empty;
+            string all = string.Empty;
+            foreach (string str in obj)
+            {
+                all += $"{str},\x20";
+            }
+            return all.Substring(all.Length, all.Length - 2);
+        }
+
+        public class RandomGenerator
+        {
+            readonly RNGCryptoServiceProvider csp;
+
+            public RandomGenerator()
+            {
+                csp = new RNGCryptoServiceProvider();
+            }
+
+            public int Next(int minValue, int maxExclusiveValue)
+            {
+                if (minValue >= maxExclusiveValue)
+                    throw new ArgumentOutOfRangeException("minValue must be lower than maxExclusiveValue");
+
+                long diff = (long)maxExclusiveValue - minValue;
+                long upperBound = uint.MaxValue / diff * diff;
+
+                uint ui;
+                do
+                {
+                    ui = GetRandomUInt();
+                } while (ui >= upperBound);
+                return (int)(minValue + (ui % diff));
+            }
+
+            private uint GetRandomUInt()
+            {
+                var randomBytes = GenerateRandomBytes(sizeof(uint));
+                return BitConverter.ToUInt32(randomBytes, 0);
+            }
+
+            private byte[] GenerateRandomBytes(int bytesNumber)
+            {
+                byte[] buffer = new byte[bytesNumber];
+                csp.GetBytes(buffer);
+                return buffer;
+            }
         }
     }
 }

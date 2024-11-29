@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 
 namespace SharpENDEC
 {
@@ -19,6 +20,15 @@ namespace SharpENDEC
             og = Console.ForegroundColor;
             Console.ForegroundColor = foreground;
             Console.Write(value);
+            Console.ForegroundColor = og;
+        }
+
+        public static void WriteLineErr(string value = "")
+        {
+            File.AppendAllText("error.log", $"{DateTime.Now:F} | {value}");
+            og = Console.ForegroundColor;
+            Console.ForegroundColor = ConsoleColor.DarkRed;
+            Console.WriteLine(value);
             Console.ForegroundColor = og;
         }
     }

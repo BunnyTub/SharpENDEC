@@ -5,7 +5,6 @@ using System.IO;
 using System.Linq;
 using System.Net.Sockets;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading;
 
 namespace SharpENDEC
@@ -64,7 +63,7 @@ namespace SharpENDEC
                                 }
                                 catch (IOException e)
                                 {
-                                    ConsoleExt.WriteLine($"[{host}:{port}] {e.Message}", ConsoleColor.Red);
+                                    ConsoleExt.WriteLineErr($"[{host}:{port}] {e.Message}");
                                     return;
                                 }
                                 Thread.Sleep(1000);
@@ -93,8 +92,8 @@ namespace SharpENDEC
                             if (chunk.Contains(delimiter))
                             {
                                 ConsoleExt.WriteLine($"[{host}:{port}] {LanguageStrings.ProcessedStream(Settings.Default.CurrentLanguage, data.Count, now)}");
-                                string capturedSent = Regex.Match(dataReceived, @"<sent>\s*(.*?)\s*</sent>", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Singleline).Groups[1].Value.Replace("-", "_").Replace("+", "p").Replace(":", "_");
-                                string capturedIdent = Regex.Match(dataReceived, @"<identifier>\s*(.*?)\s*</identifier>", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Singleline).Groups[1].Value.Replace("-", "_").Replace("+", "p").Replace(":", "_");
+                                string capturedSent = SentRegex.Match(dataReceived).Groups[1].Value.Replace("-", "_").Replace("+", "p").Replace(":", "_");
+                                string capturedIdent = IdentifierRegex.Match(dataReceived).Groups[1].Value.Replace("-", "_").Replace("+", "p").Replace(":", "_");
                                 string filename = $"{capturedSent}I{capturedIdent}.xml";
 
                                 if (SharpDataQueue.Any(x => x.Name == filename) || SharpDataHistory.Any(x => x.Name == filename))
@@ -104,7 +103,7 @@ namespace SharpENDEC
                                 else
                                 {
                                     SharpDataQueue.Add(new SharpDataItem(filename, dataReceived));
-                                    ConsoleExt.WriteLine($"[{host}:{port}] {LanguageStrings.FileDownloaded(Settings.Default.CurrentLanguage, host)}");
+                                    ConsoleExt.WriteLine($"[{host}:{port}] {LanguageStrings.FileDownloaded(Settings.Default.CurrentLanguage)}");
                                 }
                                 dataReceived = string.Empty;
                             }
@@ -112,7 +111,9 @@ namespace SharpENDEC
                             {
                                 if (data.Count > 10000000)
                                 {
-                                    throw new Exception($"[{host}:{port}] The data exceeds the 10 MB limit. The server may be malfunctioning.");
+                                    //throw new OverflowException($"[{host}:{port}] The data exceeds the 10 MB limit. The server may be malfunctioning.");
+                                    ConsoleExt.WriteLineErr($"[{host}:{port}] The data exceeds the 10 MB limit. The server may be malfunctioning.");
+                                    return;
                                 }
                                 else ConsoleExt.WriteLine($"[{host}:{port}] {data.Count} bytes total including the current chunk.");
                             }
@@ -121,13 +122,13 @@ namespace SharpENDEC
                 }
                 catch (SocketException e)
                 {
-                    ConsoleExt.WriteLine($"[{host}:{port}] {e.Message}");
+                    ConsoleExt.WriteLineErr($"[{host}:{port}] {e.Message}");
                     Thread.Sleep(1000);
                     return;
                 }
                 catch (TimeoutException)
                 {
-                    ConsoleExt.WriteLine($"[{host}:{port}] {LanguageStrings.HostTimedOut(Settings.Default.CurrentLanguage, host)}");
+                    ConsoleExt.WriteLineErr($"[{host}:{port}] {LanguageStrings.HostTimedOut(Settings.Default.CurrentLanguage, host)}");
                     return;
                 }
                 catch (ThreadAbortException)
@@ -140,6 +141,8 @@ namespace SharpENDEC
 
             public bool Main()
             {
+                if (!SharpDataQueue.IsNull()) SharpDataQueue.Clear();
+                if (!SharpDataHistory.IsNull()) SharpDataHistory.Clear();
                 SharpDataQueue = new List<SharpDataItem>();
                 SharpDataHistory = new List<SharpDataItem>();
 
@@ -149,7 +152,7 @@ namespace SharpENDEC
                     {
                         Thread thread = new Thread(() => Receive(server, 8080, "</alert>"));
                         thread.Start();
-                        ClientThreads.Add(thread);
+                        CaptureThreads.Add(thread);
                         ConsoleExt.WriteLine($"{LanguageStrings.StartingConnection(Settings.Default.CurrentLanguage, server, 8080)}", ConsoleColor.DarkGray);
                         Thread.Sleep(250);
                     }
@@ -161,9 +164,9 @@ namespace SharpENDEC
                 {
                     while (true)
                     {
-                        for (int i = 0; i < ClientThreads.Count; i++)
+                        for (int i = 0; i < CaptureThreads.Count; i++)
                         {
-                            if (!ClientThreads[i].IsAlive)
+                            if (!CaptureThreads[i].IsAlive)
                             {
                                 if (!ShutdownCapture)
                                 {
@@ -171,15 +174,15 @@ namespace SharpENDEC
                                     string server = Settings.Default.CanadianServers[i];
                                     Thread newThread = new Thread(() => Receive(server, 8080, "</alert>"));
                                     newThread.Start();
-                                    ClientThreads[i] = newThread;
+                                    CaptureThreads[i] = newThread;
                                 }
                             }
                         }
 
                         if (ShutdownCapture)
                         {
-                            lock (ClientThreads)
-                            foreach (var thread in ClientThreads)
+                            lock (CaptureThreads)
+                            foreach (var thread in CaptureThreads)
                             {
                                 try
                                 {
