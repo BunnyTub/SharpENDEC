@@ -17,7 +17,7 @@ Newtonsoft.Json
 
 > [!NOTE]
 > Although SharpENDEC is meant to replicate an ENDEC, it is **not** meant to be a complete ENDEC replacement.
-> Physical hardware is usually more stable, and more capable in terms of processing.
+> Physical hardware is usually more capable physically, software-wise, external control, etc.
 
 [Join the EAS Culture Discord server!](https://discord.gg/qQQqF52jhT)
 
