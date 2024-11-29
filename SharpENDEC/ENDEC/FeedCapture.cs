@@ -5,7 +5,6 @@ using System.IO;
 using System.Linq;
 using System.Net.Sockets;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading;
 
 namespace SharpENDEC
@@ -93,8 +92,8 @@ namespace SharpENDEC
                             if (chunk.Contains(delimiter))
                             {
                                 ConsoleExt.WriteLine($"[{host}:{port}] {LanguageStrings.ProcessedStream(Settings.Default.CurrentLanguage, data.Count, now)}");
-                                string capturedSent = Regex.Match(dataReceived, @"<sent>\s*(.*?)\s*</sent>", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Singleline).Groups[1].Value.Replace("-", "_").Replace("+", "p").Replace(":", "_");
-                                string capturedIdent = Regex.Match(dataReceived, @"<identifier>\s*(.*?)\s*</identifier>", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Singleline).Groups[1].Value.Replace("-", "_").Replace("+", "p").Replace(":", "_");
+                                string capturedSent = SentRegex.Match(dataReceived).Groups[1].Value.Replace("-", "_").Replace("+", "p").Replace(":", "_");
+                                string capturedIdent = IdentifierRegex.Match(dataReceived).Groups[1].Value.Replace("-", "_").Replace("+", "p").Replace(":", "_");
                                 string filename = $"{capturedSent}I{capturedIdent}.xml";
 
                                 if (SharpDataQueue.Any(x => x.Name == filename) || SharpDataHistory.Any(x => x.Name == filename))
@@ -104,7 +103,7 @@ namespace SharpENDEC
                                 else
                                 {
                                     SharpDataQueue.Add(new SharpDataItem(filename, dataReceived));
-                                    ConsoleExt.WriteLine($"[{host}:{port}] {LanguageStrings.FileDownloaded(Settings.Default.CurrentLanguage, host)}");
+                                    ConsoleExt.WriteLine($"[{host}:{port}] {LanguageStrings.FileDownloaded(Settings.Default.CurrentLanguage)}");
                                 }
                                 dataReceived = string.Empty;
                             }

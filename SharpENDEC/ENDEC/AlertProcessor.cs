@@ -3,7 +3,6 @@ using NAudio.Wave;
 using SharpENDEC.Properties;
 using System;
 using System.Collections.Generic;
-using System.Drawing;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -11,7 +10,6 @@ using System.Net.Http;
 using System.Speech.Synthesis;
 using System.Text.RegularExpressions;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace SharpENDEC
 {
@@ -45,28 +43,29 @@ namespace SharpENDEC
                 ConsoleExt.WriteLine($"[Alert Processor] {LanguageStrings.AlertInvalid(Settings.Default.CurrentLanguage)}", ConsoleColor.DarkGray);
                 return;
             }
-            bool IsUI = Settings.Default.WirelessAlertMode;
-            foreach (Match match in Regex.Matches(relayItem.Data, @"<valueName>([^<]+)</valueName>\s*<value>([^<]+)</value>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline))
-            {
-                if (match.Groups[1].Value == "layer:SOREM:2.0:WirelessText")
-                {
-                    if (!string.IsNullOrWhiteSpace(match.Groups[2].Value))
-                    {
-                        IsUI = true;
-                        break;
-                    }
-                }
 
-                //ConsoleExt.WriteLine($"valueName: {match.Groups[1].Value}");
-                //ConsoleExt.WriteLine($"value: {match.Groups[2].Value}");
-            }
+            //bool IsUI = Settings.Default.WirelessAlertMode;
+            //foreach (Match match in ValueNameRegex.Matches(relayItem.Data))
+            //{
+            //    if (match.Groups[1].Value == "layer:SOREM:2.0:WirelessText")
+            //    {
+            //        if (!string.IsNullOrWhiteSpace(match.Groups[2].Value))
+            //        {
+            //            IsUI = true;
+            //            break;
+            //        }
+            //    }
 
-            Match sentMatch = Regex.Match(relayItem.Data, @"<sent>\s*(.*?)\s*</sent>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
-            Match statusMatch = Regex.Match(relayItem.Data, @"<status>\s*(.*?)\s*</status>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
-            Match messageTypeMatch = Regex.Match(relayItem.Data, @"<msgType>\s*(.*?)\s*</msgType>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
-            MatchCollection broadcastImmediatelyMatches = Regex.Matches(relayItem.Data, @"<valueName>layer:SOREM:1.0:Broadcast_Immediately</valueName>\s*<value>\s*(.*?)\s*</value>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
-            MatchCollection urgencyMatches = Regex.Matches(relayItem.Data, @"<urgency>\s*(.*?)\s*</urgency>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
-            MatchCollection severityMatches = Regex.Matches(relayItem.Data, @"<severity>\s*(.*?)\s*</severity>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            //    //ConsoleExt.WriteLine($"valueName: {match.Groups[1].Value}");
+            //    //ConsoleExt.WriteLine($"value: {match.Groups[2].Value}");
+            //}
+
+            Match sentMatch = SentRegex.Match(relayItem.Data);
+            Match statusMatch = StatusRegex.Match(relayItem.Data);
+            Match messageTypeMatch = MessageTypeRegex.Match(relayItem.Data);
+            MatchCollection broadcastImmediatelyMatches = BroadcastImmediatelyRegex.Matches(relayItem.Data);
+            MatchCollection urgencyMatches = UrgencyRegex.Matches(relayItem.Data);
+            MatchCollection severityMatches = InfoRegex.Matches(relayItem.Data);
 
             bool final = false;
 
@@ -80,9 +79,10 @@ namespace SharpENDEC
                         break;
                     }
                 }
-                catch (ArgumentOutOfRangeException e)
+                catch (Exception e)
                 {
-                    ConsoleExt.WriteLineErr(e.Message);
+                    ConsoleExt.WriteLineErr($"[Alert Processor] An incompatible or damaged XML was detected, and won't be processed further. {e.Message}");
+                    return;
                 }
             }
 
@@ -92,7 +92,7 @@ namespace SharpENDEC
                 return;
             }
 
-            MatchCollection infoMatches = Regex.Matches(relayItem.Data, @"<info>\s*(.*?)\s*</info>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            MatchCollection infoMatches = InfoRegex.Matches(relayItem.Data);
             int infoProc = 0;
 
             foreach (Match infoMatch in infoMatches)
@@ -101,7 +101,7 @@ namespace SharpENDEC
                 ConsoleExt.WriteLine($"[Alert Processor] {LanguageStrings.GenericProcessingValueOfValue(Settings.Default.CurrentLanguage, infoProc, infoMatches.Count)}");
                 string infoEN = $"<info>{infoMatch.Groups[1].Value}</info>";
                 string lang = "en";
-                if (Regex.Match(infoEN, @"<language>\s*(.*?)\s*</language>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline).Groups[1].Value == "fr-CA")
+                if (LanguageRegex.Match(infoEN).Groups[1].Value == "fr-CA")
                 {
                     lang = "fr";
                 }
@@ -112,14 +112,13 @@ namespace SharpENDEC
 
                 string Status = statusMatch.Groups[1].Value;
                 string MsgType = messageTypeMatch.Groups[1].Value;
-                Match effectiveMatch = Regex.Match(relayItem.Data, @"<effective>\s*(.*?)\s*</effective>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
-                Match expiryMatch = Regex.Match(relayItem.Data, @"<expires>\s*(.*?)\s*</expires>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
-                string EventType = Regex.Match(infoEN, @"<event>\s*(.*?)\s*</event>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline).Groups[1].Value;
-                string urgency = Regex.Match(infoEN, @"<urgency>\s*(.*?)\s*</urgency>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline).Groups[1].Value;
-                string severity = Regex.Match(infoEN, @"<severity>\s*(.*?)\s*</severity>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline).Groups[1].Value;
-                //string when = Regex.Match(@"<sent>\s*(.*?)\s*</sent>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline).Groups[1].Value;
+                Match effectiveMatch = EffectiveRegex.Match(relayItem.Data);
+                Match expiryMatch = ExpiresRegex.Match(relayItem.Data);
+                string EventType = EventRegex.Match(infoEN).Groups[1].Value;
+                string urgency = UrgencyRegex.Match(infoEN).Groups[1].Value;
+                string severity = SeverityRegex.Match(infoEN).Groups[1].Value;
                 string broadcastImmediately;
-                Match broadcastImmediatelyMatch = Regex.Match(infoEN, @"<valueName>layer:SOREM:1.0:Broadcast_Immediately</valueName>\s*<value>\s*(.*?)\s*</value>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                Match broadcastImmediatelyMatch = BroadcastImmediatelyRegex.Match(infoEN);
                 if (broadcastImmediatelyMatch.Success)
                 {
                     broadcastImmediately = broadcastImmediatelyMatch.Groups[1].Value;
@@ -131,15 +130,15 @@ namespace SharpENDEC
 
                 EventDetails EventInfo = GetEventDetails(EventType);
 
-                ConsoleExt.WriteLine(Status, ConsoleColor.DarkGray);
-                ConsoleExt.WriteLine(MsgType, ConsoleColor.DarkGray);
-                ConsoleExt.WriteLine($"{EventType} | {EventInfo.FriendlyName}", ConsoleColor.DarkGray);
-                ConsoleExt.WriteLine(urgency, ConsoleColor.DarkGray);
-                ConsoleExt.WriteLine(severity, ConsoleColor.DarkGray);
-                ConsoleExt.WriteLine(broadcastImmediately, ConsoleColor.DarkGray);
-                ConsoleExt.WriteLine(sentMatch.Groups[1].Value, ConsoleColor.DarkGray);
-                ConsoleExt.WriteLine(effectiveMatch.Groups[1].Value, ConsoleColor.DarkGray);
-                ConsoleExt.WriteLine(expiryMatch.Groups[1].Value, ConsoleColor.DarkGray);
+                ConsoleExt.WriteLine($"Status: {Status}", ConsoleColor.Green);
+                ConsoleExt.WriteLine($"Message Type: {MsgType}", ConsoleColor.Green);
+                ConsoleExt.WriteLine($"Event Type: {EventType}", ConsoleColor.Green);
+                ConsoleExt.WriteLine($"Urgency: {urgency}", ConsoleColor.Green);
+                ConsoleExt.WriteLine($"Severity: {severity}", ConsoleColor.Green);
+                ConsoleExt.WriteLine($"Broadcast Immediately: {broadcastImmediately}", ConsoleColor.Green);
+                ConsoleExt.WriteLine($"Sent: {sentMatch.Groups[1].Value}", ConsoleColor.Green);
+                ConsoleExt.WriteLine($"Effective: {effectiveMatch.Groups[1].Value}", ConsoleColor.Green);
+                ConsoleExt.WriteLine($"Expires: {expiryMatch.Groups[1].Value}", ConsoleColor.Green);
 
                 if (DateTime.Parse(expiryMatch.Groups[1].Value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal) <= DateTime.Now)
                 {
@@ -425,32 +424,22 @@ namespace SharpENDEC
                 string BeginFormatted = lang == "fr" ? $"{effectiveDate:HH}'{effectiveDate:h}'{effectiveDate:mm} {TimeZoneName}" : $"{effectiveDate:HH:mm} {TimeZoneName}, {effectiveDate:MMMM dd}, {effectiveDate:yyyy}";
                 string EndFormatted = lang == "fr" ? $"{expiryDate:HH}'{expiryDate:h}'{expiryDate:mm} {TimeZoneName}" : $"{expiryDate:HH:mm} {TimeZoneName}, {expiryDate:MMMM dd}, {expiryDate:yyyy}";
 
-                // add uppercase to first letter of EventType if possible.
                 string EventType;
                 try
                 {
-                    EventType = Regex.Match(InfoData, @"<valueName>layer:EC-MSC-SMC:1.0:Alert_Name</valueName>\s*<value>\s*(.*?)\s*</value>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline).Groups[1].Value;
+                    EventType = EventTypeRegex.Match(InfoData).Groups[1].Value;
                     EventType = Regex.Replace(EventType.ToLower(), @"(^\w)|(\s\w)", m => m.Value.ToUpper());
                     EventType = lang == "fr" ? $"Le type d'événement est {EventType}." : $"Event type is {EventType}.";
                 }
                 catch (Exception)
                 {
-                    try
-                    {
-                        EventType = Regex.Match(InfoData, @"<event>\s*(.*?)\s*</event>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline).Groups[1].Value;
-                        EventType = Regex.Replace(EventType.ToLower(), @"(^\w)|(\s\w)", m => m.Value.ToUpper());
-                        EventType = lang == "fr" ? $"Le type d'événement est {EventType}." : $"Event type is {EventType}.";
-                    }
-                    catch (Exception)
-                    {
-                        EventType = lang == "fr" ? $"Le type d'événement n'a pas été spécifié." : $"Event type is not known.";
-                    }
+                    EventType = lang == "fr" ? $"Le type d'événement n'a pas été spécifié." : $"Event type is not known.";
                 }
 
                 string Coverage;
                 try
                 {
-                    Coverage = Regex.Match(InfoData, @"<valueName>layer:EC-MSC-SMC:1.0:Alert_Coverage</valueName>\s*<value>\s*(.*?)\s*</value>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline).Groups[1].Value;
+                    Coverage = CoverageRegex.Match(InfoData).Groups[1].Value;
                     Coverage = lang == "fr" ? $"Pour {Coverage} :" : $"For {Coverage}:";
                 }
                 catch (Exception)
@@ -458,7 +447,7 @@ namespace SharpENDEC
                     Coverage = lang == "fr" ? "Pour :" : "For:";
                 }
 
-                string[] areaDescMatches = Regex.Matches(InfoData, @"<areaDesc>\s*(.*?)\s*</areaDesc>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline)
+                string[] areaDescMatches = AreaDescriptionRegex.Matches(InfoData)
                     .Cast<Match>()
                     .Select(m => m.Groups[1].Value)
                     .ToArray();
@@ -469,7 +458,7 @@ namespace SharpENDEC
 
                 try
                 {
-                    SenderName = Regex.Match(InfoData, @"<senderName>\s*(.*?)\s*</senderName>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline).Groups[1].Value;
+                    SenderName = SenderNameRegex.Match(InfoData).Groups[1].Value;
                 }
                 catch (Exception)
                 {
@@ -480,7 +469,7 @@ namespace SharpENDEC
 
                 try
                 {
-                    Description = SentenceAppendEnd(Regex.Match(InfoData, @"<description>\s*(.*?)\s*</description>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline).Groups[1].Value.Replace("\n", " "));
+                    Description = SentenceAppendEnd(DescriptionRegex.Match(InfoData).Groups[1].Value.Replace("\r\n", " ").Replace("\n", " "));
                 }
                 catch (Exception)
                 {
@@ -491,7 +480,7 @@ namespace SharpENDEC
 
                 try
                 {
-                    Instruction = SentenceAppendEnd(Regex.Match(InfoData, @"<instruction>\s*(.*?)\s*</instruction>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline).Groups[1].Value.Replace("\n", " "));
+                    Instruction = SentenceAppendEnd(InstructionRegex.Match(InfoData).Groups[1].Value.Replace("\r\n", " ").Replace("\n", " "));
                 }
                 catch (Exception)
                 {
@@ -545,7 +534,7 @@ namespace SharpENDEC
                 BroadcastText += SentenceAppendSpace(SentenceAppendEnd(Description));
                 BroadcastText += SentenceAppendSpace(SentenceAppendEnd(Instruction));
                 
-                Match match = Regex.Match(InfoData, @"<valueName>layer:SOREM:1.0:Broadcast_Text</valueName>\s*<value>\s*(.*?)\s*</value>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                Match match = BroadcastTextRegex.Match(InfoData);
 
                 if (match.Success)
                 {
@@ -558,276 +547,283 @@ namespace SharpENDEC
                 return BroadcastText;
             }
 
-            public string LegacyBroadcastInfo(string lang)
-            {
-                string BroadcastText = "";
+            //public string LegacyBroadcastInfo(string lang)
+            //{
+            //    string BroadcastText = "";
 
-                string SentenceAppendEnd(string value)
-                {
-                    value = value.Trim();
-                    if (value.EndsWith(".") || value.EndsWith("!") || value.EndsWith(",")) return value;
-                    else return value += ".";
-                }
+            //    string SentenceAppendEnd(string value)
+            //    {
+            //        value = value.Trim();
+            //        if (value.EndsWith(".") || value.EndsWith("!") || value.EndsWith(",")) return value;
+            //        else return value += ".";
+            //    }
 
-                string SentenceAppendSpace(string value)
-                {
-                    value = value.Trim();
-                    if (string.IsNullOrWhiteSpace(value)) return string.Empty;
-                    else return value += "\x20";
-                }
+            //    string SentenceAppendSpace(string value)
+            //    {
+            //        value = value.Trim();
+            //        if (string.IsNullOrWhiteSpace(value)) return string.Empty;
+            //        else return value += "\x20";
+            //    }
 
-                string SentencePuncuationCorrection(string value)
-                {
-                    value = value.Trim();
-                    while (value.EndsWith("\x20.") || value.EndsWith("\x20,"))
-                    {
-                        value = value.Substring(0, value.Length - 1);
-                    }
-                    return value = SentenceAppendEnd(value.Substring(0, value.Length - 2));
-                }
+            //    string SentencePuncuationCorrection(string value)
+            //    {
+            //        value = value.Trim();
+            //        while (value.EndsWith("\x20.") ||
+            //            value.EndsWith("\x20,") ||
+            //            value.EndsWith("\x20!") ||
+            //            value.EndsWith("\x20?") ||
+            //            value.EndsWith("\x20?") ||
+            //            value.EndsWith("\x20"))
+            //        {
+            //            value = value.Substring(0, value.Length - 1);
+            //        }
+            //        return value = SentenceAppendEnd(value.Substring(0, value.Length - 2));
+            //    }
 
-                Match match = Regex.Match(InfoData, @"<valueName>layer:SOREM:1.0:Broadcast_Text</valueName>\s*<value>\s*(.*?)\s*</value>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
-                if (match.Success)
-                {
-                    BroadcastText = match.Groups[1].Value.Replace("\r\n", "\x20").Replace("\n", "\x20").Replace("\x20\x20\x20", "\x20").Replace("\x20\x20", "\x20").Trim();
-                }
-                else
-                {
-                    string issue, update, cancel;
-                    if (lang == "fr")
-                    {
-                        issue = "émis";
-                        update = "mis à jour";
-                        cancel = "annulé";
-                    }
-                    else
-                    {
-                        issue = "issued";
-                        update = "updated";
-                        cancel = "cancelled";
-                    }
+            //    Match match = BroadcastTextRegex.Match(InfoData);
 
-                    string MsgPrefix;
-                    switch (MsgType.ToLower())
-                    {
-                        case "alert":
-                            MsgPrefix = issue;
-                            break;
-                        case "update":
-                            MsgPrefix = update;
-                            break;
-                        case "cancel":
-                            MsgPrefix = cancel;
-                            break;
-                        default:
-                            MsgPrefix = "issued";
-                            break;
-                    }
+            //    if (match.Success)
+            //    {
+            //        BroadcastText = match.Groups[1].Value.Replace("\r\n", "\x20").Replace("\n", "\x20").Replace("\x20\x20\x20", "\x20").Replace("\x20\x20", "\x20").Trim();
+            //    }
+            //    else
+            //    {
+            //        string issue, update, cancel;
+            //        if (lang == "fr")
+            //        {
+            //            issue = "émis";
+            //            update = "mis à jour";
+            //            cancel = "annulé";
+            //        }
+            //        else
+            //        {
+            //            issue = "issued";
+            //            update = "updated";
+            //            cancel = "cancelled";
+            //        }
 
-                    DateTime sentDate;
-                    try
-                    {
-                        sentDate = DateTime.Parse(Sent, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal);
-                    }
-                    catch (Exception e)
-                    {
-                        ConsoleExt.WriteLine(e.Message);
-                        sentDate = DateTime.Now;
-                    }
+            //        string MsgPrefix;
+            //        switch (MsgType.ToLower())
+            //        {
+            //            case "alert":
+            //                MsgPrefix = issue;
+            //                break;
+            //            case "update":
+            //                MsgPrefix = update;
+            //                break;
+            //            case "cancel":
+            //                MsgPrefix = cancel;
+            //                break;
+            //            default:
+            //                MsgPrefix = "issued";
+            //                break;
+            //        }
 
-                    DateTime effectiveDate;
-                    try
-                    {
-                        effectiveDate = DateTime.Parse(Sent, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal);
-                    }
-                    catch (Exception e)
-                    {
-                        ConsoleExt.WriteLine(e.Message);
-                        effectiveDate = DateTime.Now;
-                    }
+            //        DateTime sentDate;
+            //        try
+            //        {
+            //            sentDate = DateTime.Parse(Sent, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal);
+            //        }
+            //        catch (Exception e)
+            //        {
+            //            ConsoleExt.WriteLine(e.Message);
+            //            sentDate = DateTime.Now;
+            //        }
 
-                    DateTime expiryDate;
-                    try
-                    {
-                        expiryDate = DateTime.Parse(Sent, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal);
-                    }
-                    catch (Exception e)
-                    {
-                        ConsoleExt.WriteLine(e.Message);
-                        expiryDate = DateTime.Now.AddHours(1);
-                    }
+            //        DateTime effectiveDate;
+            //        try
+            //        {
+            //            effectiveDate = DateTime.Parse(Sent, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal);
+            //        }
+            //        catch (Exception e)
+            //        {
+            //            ConsoleExt.WriteLine(e.Message);
+            //            effectiveDate = DateTime.Now;
+            //        }
 
-                    //DateTime sentDate = DateTime.Parse(Sent, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal).ToUniversalTime();
+            //        DateTime expiryDate;
+            //        try
+            //        {
+            //            expiryDate = DateTime.Parse(Sent, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal);
+            //        }
+            //        catch (Exception e)
+            //        {
+            //            ConsoleExt.WriteLine(e.Message);
+            //            expiryDate = DateTime.Now.AddHours(1);
+            //        }
 
-                    string TimeZoneName = "Unknown Time Zone";
+            //        //DateTime sentDate = DateTime.Parse(Sent, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal).ToUniversalTime();
 
-                    string OffsetToTimeZoneName(int utcOffset)
-                    {
-                        utcOffset = +1;
-                        DateTime now = DateTime.UtcNow;
-                        List<string> matchingTimeZones = new List<string>();
-                        foreach (TimeZoneInfo tz in TimeZoneInfo.GetSystemTimeZones())
-                        {
-                            TimeSpan offset = tz.BaseUtcOffset;
+            //        string TimeZoneName = "Unknown Time Zone";
 
-                            if (offset.Hours == utcOffset)
-                            {
-                                ConsoleExt.WriteLine($"{tz.DaylightName} {tz.DaylightName}", ConsoleColor.DarkGray);
-                                if (tz.IsDaylightSavingTime(now))
-                                {
-                                    matchingTimeZones.Add(tz.DaylightName);
-                                }
-                                else
-                                {
-                                    matchingTimeZones.Add(tz.StandardName);
-                                }
-                            }
-                        }
+            //        string OffsetToTimeZoneName(int utcOffset)
+            //        {
+            //            utcOffset = +1;
+            //            DateTime now = DateTime.UtcNow;
+            //            List<string> matchingTimeZones = new List<string>();
+            //            foreach (TimeZoneInfo tz in TimeZoneInfo.GetSystemTimeZones())
+            //            {
+            //                TimeSpan offset = tz.BaseUtcOffset;
 
-                        return matchingTimeZones.Count > 0 ? matchingTimeZones[0] : $"UTC -{utcOffset}";
-                    }
+            //                if (offset.Hours == utcOffset)
+            //                {
+            //                    ConsoleExt.WriteLine($"{tz.DaylightName} {tz.DaylightName}", ConsoleColor.DarkGray);
+            //                    if (tz.IsDaylightSavingTime(now))
+            //                    {
+            //                        matchingTimeZones.Add(tz.DaylightName);
+            //                    }
+            //                    else
+            //                    {
+            //                        matchingTimeZones.Add(tz.StandardName);
+            //                    }
+            //                }
+            //            }
 
-                    string sentISO = sentDate.ToString("zz");
+            //            return matchingTimeZones.Count > 0 ? matchingTimeZones[0] : $"UTC -{utcOffset}";
+            //        }
 
-                    switch (lang)
-                    {
-                        case "fr":
-                            TimeZoneName = OffsetToTimeZoneName(int.Parse(sentISO));
-                            break;
-                        case "en":
-                        default:
-                            TimeZoneName = OffsetToTimeZoneName(int.Parse(sentISO));
-                            break;
-                    }
+            //        string sentISO = sentDate.ToString("zz");
 
-                    string SentFormatted = lang == "fr" ? $"{sentDate:HH}'{sentDate:h}'{sentDate:mm} {TimeZoneName}." : $"{sentDate:HH:mm} {TimeZoneName}, {sentDate:MMMM dd}, {sentDate:yyyy}.";
-                    string BeginFormatted = lang == "fr" ? $"{effectiveDate:HH}'{effectiveDate:h}'{effectiveDate:mm} {TimeZoneName}." : $"{effectiveDate:HH:mm} {TimeZoneName}, {effectiveDate:MMMM dd}, {effectiveDate:yyyy}.";
-                    string EndFormatted = lang == "fr" ? $"{expiryDate:HH}'{expiryDate:h}'{expiryDate:mm} {TimeZoneName}." : $"{expiryDate:HH:mm} {TimeZoneName}, {expiryDate:MMMM dd}, {expiryDate:yyyy}.";
+            //        switch (lang)
+            //        {
+            //            case "fr":
+            //                TimeZoneName = OffsetToTimeZoneName(int.Parse(sentISO));
+            //                break;
+            //            case "en":
+            //            default:
+            //                TimeZoneName = OffsetToTimeZoneName(int.Parse(sentISO));
+            //                break;
+            //        }
 
-                    string EventType;
-                    try
-                    {
-                        EventType = Regex.Match(InfoData, @"<valueName>layer:EC-MSC-SMC:1.0:Alert_Name</valueName>\s*<value>\s*(.*?)\s*</value>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline).Groups[1].Value;
-                    }
-                    catch (Exception)
-                    {
-                        EventType = Regex.Match(InfoData, @"<event>\s*(.*?)\s*</event>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline).Groups[1].Value;
-                        EventType = lang == "fr" ? $"alerte {EventType}" : $"{EventType} alert";
-                    }
+            //        string SentFormatted = lang == "fr" ? $"{sentDate:HH}'{sentDate:h}'{sentDate:mm} {TimeZoneName}." : $"{sentDate:HH:mm} {TimeZoneName}, {sentDate:MMMM dd}, {sentDate:yyyy}.";
+            //        string BeginFormatted = lang == "fr" ? $"{effectiveDate:HH}'{effectiveDate:h}'{effectiveDate:mm} {TimeZoneName}." : $"{effectiveDate:HH:mm} {TimeZoneName}, {effectiveDate:MMMM dd}, {effectiveDate:yyyy}.";
+            //        string EndFormatted = lang == "fr" ? $"{expiryDate:HH}'{expiryDate:h}'{expiryDate:mm} {TimeZoneName}." : $"{expiryDate:HH:mm} {TimeZoneName}, {expiryDate:MMMM dd}, {expiryDate:yyyy}.";
 
-                    string Coverage;
-                    try
-                    {
-                        Coverage = Regex.Match(InfoData, @"<valueName>layer:EC-MSC-SMC:1.0:Alert_Coverage</valueName>\s*<value>\s*(.*?)\s*</value>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline).Groups[1].Value;
-                        Coverage = lang == "fr" ? $"en {Coverage} pour:" : $"in {Coverage} for:";
-                    }
-                    catch (Exception)
-                    {
-                        Coverage = lang == "fr" ? "pour:" : "for:";
-                    }
+            //        string EventType;
+            //        try
+            //        {
+            //            EventType = EventRegex.Match(InfoData).Groups[1].Value;
+            //        }
+            //        catch (Exception)
+            //        {
+            //            // why
+            //            EventType = EventRegex.Match(InfoData).Groups[1].Value;
+            //            EventType = lang == "fr" ? $"alerte {EventType}" : $"{EventType} alert";
+            //        }
 
-                    string[] areaDescMatches = Regex.Matches(InfoData, @"<areaDesc>\s*(.*?)\s*</areaDesc>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline)
-                        .Cast<Match>()
-                        .Select(m => m.Groups[1].Value)
-                        .ToArray();
+            //        string Coverage;
+            //        try
+            //        {
+            //            Coverage = CoverageRegex.Match(InfoData).Groups[1].Value;
+            //            Coverage = lang == "fr" ? $"en {Coverage} pour:" : $"in {Coverage} for:";
+            //        }
+            //        catch (Exception)
+            //        {
+            //            Coverage = lang == "fr" ? "pour:" : "for:";
+            //        }
 
-                    string AreaDesc = string.Join(", ", areaDescMatches) + ".";
+            //        string[] areaDescMatches = AreaDescriptionRegex.Matches(InfoData)
+            //            .Cast<Match>()
+            //            .Select(m => m.Groups[1].Value)
+            //            .ToArray();
 
-                    string SenderName;
+            //        string AreaDesc = string.Join(", ", areaDescMatches) + ".";
 
-                    try
-                    {
-                        SenderName = Regex.Match(InfoData, @"<senderName>\s*(.*?)\s*</senderName>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline).Groups[1].Value;
-                    }
-                    catch (Exception)
-                    {
-                        SenderName = "an alert issuer";
-                    }
+            //        string SenderName;
 
-                    string Description;
+            //        try
+            //        {
+            //            SenderName = SenderNameRegex.Match(InfoData).Groups[1].Value;
+            //        }
+            //        catch (Exception)
+            //        {
+            //            SenderName = "an alert issuer";
+            //        }
 
-                    try
-                    {
-                        Description = SentenceAppendEnd(Regex.Match(InfoData, @"<description>\s*(.*?)\s*</description>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline).Groups[1].Value.Replace("\n", " "));
-                    }
-                    catch (Exception)
-                    {
-                        Description = "";
-                    }
+            //        string Description;
 
-                    string Instruction;
+            //        try
+            //        {
+            //            Description = SentenceAppendEnd(DescriptionRegex.Match(InfoData).Groups[1].Value.Replace("\n", " "));
+            //        }
+            //        catch (Exception)
+            //        {
+            //            Description = "";
+            //        }
 
-                    try
-                    {
-                        Instruction = SentenceAppendEnd(Regex.Match(InfoData, @"<instruction>\s*(.*?)\s*</instruction>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline).Groups[1].Value.Replace("\n", " "));
-                    }
-                    catch (Exception)
-                    {
-                        Instruction = "";
-                    }
+            //        string Instruction;
 
-                    string Effective;
+            //        try
+            //        {
+            //            Instruction = SentenceAppendEnd(InstructionRegex.Match(InfoData).Groups[1].Value.Replace("\n", " "));
+            //        }
+            //        catch (Exception)
+            //        {
+            //            Instruction = "";
+            //        }
 
-                    try
-                    {
-                        Effective = effectiveDate.ToString();
-                    }
-                    catch (Exception)
-                    {
-                        Effective = "currently";
-                    }
+            //        string Effective;
 
-                    string Expiry;
+            //        try
+            //        {
+            //            Effective = effectiveDate.ToString();
+            //        }
+            //        catch (Exception)
+            //        {
+            //            Effective = "currently";
+            //        }
 
-                    try
-                    {
-                        Expiry = expiryDate.ToString();
-                    }
-                    catch (Exception)
-                    {
-                        Expiry = "soon";
-                    }
+            //        string Expiry;
 
-                    // Effective {Effective}, and expiring {Expires}.
+            //        try
+            //        {
+            //            Expiry = expiryDate.ToString();
+            //        }
+            //        catch (Exception)
+            //        {
+            //            Expiry = "soon";
+            //        }
 
-                    switch (lang)
-                    {
-                        case "fr":
-                            BroadcastText = SentenceAppendSpace("À");
-                            BroadcastText += SentenceAppendSpace(SentFormatted);
-                            BroadcastText += SentenceAppendSpace(SenderName);
-                            BroadcastText += SentenceAppendSpace("a");
-                            BroadcastText += SentenceAppendSpace(MsgPrefix);
-                            BroadcastText += SentenceAppendSpace("une");
-                            break;
-                        case "en":
-                        default:
-                            BroadcastText = SentenceAppendSpace("At");
-                            BroadcastText += SentenceAppendSpace(SentFormatted);
-                            BroadcastText += SentenceAppendSpace(SenderName);
-                            BroadcastText += SentenceAppendSpace("has");
-                            BroadcastText += SentenceAppendSpace(MsgPrefix);
-                            BroadcastText += SentenceAppendSpace("a");
-                            break;
-                    }
-                    BroadcastText += SentenceAppendSpace(EventType);
-                    BroadcastText += SentenceAppendSpace(Coverage);
-                    BroadcastText += SentenceAppendSpace(SentenceAppendEnd(AreaDesc));
-                    BroadcastText += SentenceAppendSpace(SentenceAppendEnd(Description));
-                    BroadcastText += SentenceAppendSpace(SentenceAppendEnd(Instruction));
-                    BroadcastText = SentencePuncuationCorrection(BroadcastText.Replace("###", string.Empty).Replace("\x20\x20\x20", "\x20").Replace("\x20\x20", "\x20").Trim());
-                    //BroadcastText = lang == "fr" ?
-                    //    $"À {SentFormatted} {SenderName} a {MsgPrefix} une {EventType} {Coverage} {AreaDesc}. {Description} {Instruction}".Replace("###", "").Replace("  ", " ").Trim() :
-                    //    $"At {SentFormatted} {SenderName} has {MsgPrefix} a {EventType} {Coverage} {AreaDesc}. {Description} {Instruction}".Replace("###", "").Replace("  ", " ").Trim();
-                }
+            //        // Effective {Effective}, and expiring {Expires}.
 
-                BroadcastText = SentenceAppendEnd(BroadcastText);
-                //if (BroadcastText.EndsWith("\x20.")) BroadcastText = BroadcastText.TrimEnd('\x20', '.');
-                //if (BroadcastText.EndsWith(".")) BroadcastText = BroadcastText.TrimEnd('.');
-                //if (!BroadcastText.EndsWith(".") || !BroadcastText.EndsWith("!")) BroadcastText += ".";
+            //        switch (lang)
+            //        {
+            //            case "fr":
+            //                BroadcastText = SentenceAppendSpace("À");
+            //                BroadcastText += SentenceAppendSpace(SentFormatted);
+            //                BroadcastText += SentenceAppendSpace(SenderName);
+            //                BroadcastText += SentenceAppendSpace("a");
+            //                BroadcastText += SentenceAppendSpace(MsgPrefix);
+            //                BroadcastText += SentenceAppendSpace("une");
+            //                break;
+            //            case "en":
+            //            default:
+            //                BroadcastText = SentenceAppendSpace("At");
+            //                BroadcastText += SentenceAppendSpace(SentFormatted);
+            //                BroadcastText += SentenceAppendSpace(SenderName);
+            //                BroadcastText += SentenceAppendSpace("has");
+            //                BroadcastText += SentenceAppendSpace(MsgPrefix);
+            //                BroadcastText += SentenceAppendSpace("a");
+            //                break;
+            //        }
+            //        BroadcastText += SentenceAppendSpace(EventType);
+            //        BroadcastText += SentenceAppendSpace(Coverage);
+            //        BroadcastText += SentenceAppendSpace(SentenceAppendEnd(AreaDesc));
+            //        BroadcastText += SentenceAppendSpace(SentenceAppendEnd(Description));
+            //        BroadcastText += SentenceAppendSpace(SentenceAppendEnd(Instruction));
+            //        BroadcastText = SentencePuncuationCorrection(BroadcastText.Replace("###", string.Empty).Replace("\x20\x20\x20", "\x20").Replace("\x20\x20", "\x20").Trim());
+            //        //BroadcastText = lang == "fr" ?
+            //        //    $"À {SentFormatted} {SenderName} a {MsgPrefix} une {EventType} {Coverage} {AreaDesc}. {Description} {Instruction}".Replace("###", "").Replace("  ", " ").Trim() :
+            //        //    $"At {SentFormatted} {SenderName} has {MsgPrefix} a {EventType} {Coverage} {AreaDesc}. {Description} {Instruction}".Replace("###", "").Replace("  ", " ").Trim();
+            //    }
 
-                return BroadcastText;
-            }
+            //    BroadcastText = SentenceAppendEnd(BroadcastText);
+            //    //if (BroadcastText.EndsWith("\x20.")) BroadcastText = BroadcastText.TrimEnd('\x20', '.');
+            //    //if (BroadcastText.EndsWith(".")) BroadcastText = BroadcastText.TrimEnd('.');
+            //    //if (!BroadcastText.EndsWith(".") || !BroadcastText.EndsWith("!")) BroadcastText += ".";
+
+            //    return BroadcastText;
+            //}
 
             public bool GetAudio(string audioLink, string output, int decodeType)
             {
@@ -876,8 +872,8 @@ namespace SharpENDEC
             {
                 try
                 {
-                    Match Resource = Regex.Match(InfoData, @"<resourceDesc>\s*(.*?)\s*</resourceDesc>\s*(.*?)\s*</resource>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
-                    if (!Resource.Success) throw new Exception("Audio field not found. TTS will be generated instead.");
+                    Match Resource = ResourceDescriptionRegex.Match(InfoData);
+                    if (!Resource.Success) throw new Exception("[Alert Processor] Audio field not found. TTS will be generated instead.");
                     string broadcastAudioResource = Resource.Groups[1].Value;
                     string audioLink = string.Empty;
                     string audioType = string.Empty;
@@ -885,8 +881,8 @@ namespace SharpENDEC
 
                     if (broadcastAudioResource.Contains("<derefUri>"))
                     {
-                        Match Link = Regex.Match(broadcastAudioResource, @"<derefUri>\s*(.*?)\s*</derefUri>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
-                        Match Type = Regex.Match(broadcastAudioResource, @"<mimeType>\s*(.*?)\s*</mimeType>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                        Match Link = DerefURIRegex.Match(broadcastAudioResource);
+                        Match Type = MimeRegex.Match(broadcastAudioResource);
                         decode = 1;
                         if (Link.Success && Type.Success)
                         {
@@ -896,8 +892,8 @@ namespace SharpENDEC
                     }
                     else
                     {
-                        Match Link = Regex.Match(broadcastAudioResource, @"<uri>\s*(.*?)\s*</uri>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
-                        Match Type = Regex.Match(broadcastAudioResource, @"<mimeType>\s*(.*?)\s*</mimeType>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                        Match Link = TypeURIRegex.Match(broadcastAudioResource);
+                        Match Type = MimeRegex.Match(broadcastAudioResource);
                         decode = 0;
                         if (Link.Success && Type.Success)
                         {

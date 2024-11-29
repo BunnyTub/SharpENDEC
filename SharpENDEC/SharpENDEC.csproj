@@ -275,12 +275,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ENDEC\AlertProcessor.cs" />
-    <Compile Include="ENDEC\SideloadData.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="ENDEC\SideloadData.Designer.cs">
-      <DependentUpon>SideloadData.cs</DependentUpon>
-    </Compile>
+    <Compile Include="ENDEC\RegexList.cs" />
     <Compile Include="InternalExtensions\ConsoleExt.cs" />
     <Compile Include="ConsoleForm.cs">
       <SubType>Form</SubType>
@@ -328,9 +323,6 @@
     <Compile Include="VersionInfoTemplate.cs" />
     <EmbeddedResource Include="ConsoleForm.resx">
       <DependentUpon>ConsoleForm.cs</DependentUpon>
-    </EmbeddedResource>
-    <EmbeddedResource Include="ENDEC\SideloadData.resx">
-      <DependentUpon>SideloadData.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Unused\AlertForm.resx">
       <DependentUpon>AlertForm.cs</DependentUpon>

@@ -12,7 +12,7 @@
         public const string BuiltTimeZone = "";
         public static readonly int ReleaseVersion = 3;
         public static readonly int MinorVersion = 0;
-        public static readonly bool IsCuttingEdge = true;
+        public static readonly bool IsCuttingEdge = false;
         public static string FriendlyVersion
         {
             get

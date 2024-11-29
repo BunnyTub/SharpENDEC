@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Security.Cryptography;
@@ -25,7 +23,7 @@ namespace SharpENDEC
         /// </summary>
         public static Exception UnknownException()
         {
-            return new Exception("DummyException");
+            return new Exception("UnknownException");
         }
 
         /// <summary>
@@ -57,7 +55,7 @@ namespace SharpENDEC
 
                 lock (Program.MainThreads)
                 {
-                    foreach (var (thread, method) in Program.MainThreads)
+                    foreach (var (thread, method, isMTA) in Program.MainThreads)
                         try { if (!thread.IsNull()) thread.Abort(LastException); } catch (Exception) { }
                     Program.MainThreads.Clear();
                 }
@@ -71,10 +69,10 @@ namespace SharpENDEC
                 Console.Clear();
                 Console.ForegroundColor = ConsoleColor.DarkRed;
                 string full = $"{ExceptionTime:G} | Called by {caller.Method.Name}\r\n" +
-                    $"Stack Trace: {LastException.StackTrace}\r\n" +
-                    $"Source: {LastException.Source}\r\n" +
-                    $"Message: {LastException.Message}\r\n" +
-                    $"{reason}";
+                    $"Exception Stack Trace: {LastException.StackTrace}\r\n" +
+                    $"Exception Source: {LastException.Source}\r\n" +
+                    $"Exception Message: {LastException.Message}\r\n" +
+                    $"Caller Reason: {reason}";
                 Console.WriteLine(full);
                 try
                 {
@@ -93,9 +91,16 @@ namespace SharpENDEC
                 if (restart)
                 {
                     Console.Clear();
-                    new Thread(() => Program.Main()).Start();
+#if !DEBUG
+                    Environment.Exit(1984);
+#else
+                    new Thread(() => Program.Main(null)).Start();
+#endif
                 }
-                else Thread.Sleep(Timeout.Infinite);
+                else
+                {
+                    Environment.Exit(1985);
+                }
             }
         }
 

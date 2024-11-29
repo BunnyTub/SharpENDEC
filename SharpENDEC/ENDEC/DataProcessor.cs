@@ -23,15 +23,21 @@ namespace SharpENDEC
 
                     if (relayItem.IsNull()) continue;
 
-                    ConsoleExt.WriteLine($"[Data Processor] {LanguageStrings.CapturedFromFileWatcher(Settings.Default.CurrentLanguage)}", ConsoleColor.Cyan);
+                    ConsoleExt.WriteLine($"[Data Processor] {LanguageStrings.CapturedFromFileWatcher(Settings.Default.CurrentLanguage, DateTime.Now)}", ConsoleColor.Cyan);
 
                     lock (SharpDataHistory) SharpDataHistory.Add(relayItem);
                     lock (SharpDataQueue) SharpDataQueue.Remove(relayItem);
 
+                    // trim history for memory saving
+                    if (SharpDataHistory.Count > 50)
+                    {
+                        SharpDataHistory.RemoveRange(50, SharpDataHistory.Count - 50);
+                    }
+
                     if (relayItem.Data.Contains("<sender>NAADS-Heartbeat</sender>"))
                     {
                         ConsoleExt.WriteLine($"[Data Processor] {LanguageStrings.HeartbeatDetected(Settings.Default.CurrentLanguage)}", ConsoleColor.Green);
-                        Match referencesMatch = Regex.Match(relayItem.Data, @"<references>\s*(.*?)\s*</references>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                        Match referencesMatch = ReferencesRegex.Match(relayItem.Data);
                         if (referencesMatch.Success)
                         {
                             string references = referencesMatch.Groups[1].Value;
@@ -43,10 +49,10 @@ namespace SharpENDEC
                     else
                     {
                         lock (SharpAlertQueue) SharpAlertQueue.Add(relayItem);
-                        ConsoleExt.WriteLine(LanguageStrings.AlertQueued(Settings.Default.CurrentLanguage));
+                        ConsoleExt.WriteLine($"[Data Processor] {LanguageStrings.AlertQueued(Settings.Default.CurrentLanguage)}");
                     }
 
-                    ConsoleExt.WriteLine($"[Data Processor] {LanguageStrings.LastDataReceived(Settings.Default.CurrentLanguage)} {DateTime.Now:yyyy-MM-dd HH:mm:ss}.");
+                    //ConsoleExt.WriteLine($"[Data Processor] {LanguageStrings.LastDataReceived(Settings.Default.CurrentLanguage)} {DateTime.Now:yyyy-MM-dd HH:mm:ss}.");
                 }
             }
             //catch (ThreadAbortException)
@@ -209,9 +215,7 @@ namespace SharpENDEC
                     {
                         try
                         {
-                            MatchCollection matches = Regex.Matches(InfoX,
-                                @"<geocode>\s*<valueName>profile:CAP-CP:Location:0.3</valueName>\s*<value>\s*(.*?)\s*</value>",
-                                RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                            MatchCollection matches = LocationRegex.Matches(InfoX);
                             bool GeoMatch = false;
                             foreach (Match match in matches)
                             {
@@ -246,7 +250,7 @@ namespace SharpENDEC
 
             public static void Heartbeat(string References)
             {
-                ConsoleExt.WriteLine($"[Heartbeat] {LanguageStrings.DownloadingFiles(Settings.Default.CurrentLanguage)}", ConsoleColor.DarkYellow);
+                ConsoleExt.WriteLine($"[Heartbeat] {LanguageStrings.DownloadingFiles(Settings.Default.CurrentLanguage)}", ConsoleColor.Yellow);
                 string[] RefList = References.Split(' ');
                 int DataMatched = 0;
                 int Total = 0;
@@ -254,7 +258,6 @@ namespace SharpENDEC
                 foreach (string i in RefList)
                 {
                     Total++;
-                    ConsoleExt.WriteLine($"[Heartbeat] {LanguageStrings.GenericProcessingValueOfValue(Settings.Default.CurrentLanguage, Total, RefList.Length)}", ConsoleColor.DarkYellow);
                     string filename = string.Empty;
                     string[] k = i.Split(',');
                     string sentDTFull = k[2].Replace("-", "_").Replace(":", "_").Replace("+", "p");
@@ -269,20 +272,19 @@ namespace SharpENDEC
 
                     if (SharpDataQueue.Any(x => x.Name == filename) || SharpDataHistory.Any(x => x.Name == filename))
                     {
-                        ConsoleExt.WriteLine($"[Heartbeat] {LanguageStrings.DataPreviouslyProcessed(Settings.Default.CurrentLanguage)}", ConsoleColor.Yellow);
+                        ConsoleExt.WriteLine($"[Heartbeat] -x {filename}", ConsoleColor.DarkGray);
                         DataMatched++;
                     }
                     else
                     {
-                        ConsoleExt.WriteLine($"[Heartbeat] {filename}...", ConsoleColor.Yellow);
+                        //ConsoleExt.WriteLine($"[Heartbeat] {LanguageStrings.GenericProcessingValueOfValue(Settings.Default.CurrentLanguage, Total, RefList.Length)}", ConsoleColor.Yellow);
                         string url1 = $"http://{Dom1}/{sentDT}/{filename}";
                         string url2 = $"http://{Dom2}/{sentDT}/{filename}";
 
                         try
                         {
-                            ConsoleExt.WriteLine($"-> {url1}", ConsoleColor.Yellow);
+                            ConsoleExt.WriteLine($"-> {filename}", ConsoleColor.DarkYellow);
                             Task<string> xml = client.GetStringAsync(url1);
-                            // figure out something here to avoid deadlocking
                             xml.Wait();
                             lock (SharpDataQueue) SharpDataQueue.Add(new SharpDataItem(filename, xml.Result));
                             xml.Dispose();
@@ -292,10 +294,8 @@ namespace SharpENDEC
                             try
                             {
                                 ConsoleExt.WriteLineErr($"[Heartbeat] {e1.Message}");
-                                ConsoleExt.WriteLine($"[Heartbeat] {filename}...", ConsoleColor.Yellow);
-                                ConsoleExt.WriteLine($"-> {url2}", ConsoleColor.Yellow);
+                                ConsoleExt.WriteLine($"-> {url2}", ConsoleColor.DarkYellow);
                                 Task<string> xml = client.GetStringAsync(url2);
-                                // figure out something here to avoid deadlocking
                                 xml.Wait();
                                 lock (SharpDataQueue) SharpDataQueue.Add(new SharpDataItem(filename, xml.Result));
                                 xml.Dispose();
@@ -303,7 +303,7 @@ namespace SharpENDEC
                             catch (Exception e2)
                             {
                                 ConsoleExt.WriteLineErr($"[Heartbeat] {e2.Message}");
-                                ConsoleExt.WriteLine($"[Heartbeat] {LanguageStrings.DownloadFailure(Settings.Default.CurrentLanguage)}", ConsoleColor.Red);
+                                ConsoleExt.WriteLine($"[Heartbeat] {LanguageStrings.DownloadFailure(Settings.Default.CurrentLanguage)}", ConsoleColor.DarkBlue);
                             }
                         }
                     }

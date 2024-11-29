@@ -125,17 +125,17 @@ namespace SharpENDEC
             }
         }
 
-        public static string FileDownloaded(string lang, string host)
+        public static string FileDownloaded(string lang)
         {
             switch (lang)
             {
                 case "french":
-                    return $"Données enregistrées. | De : {host}";
+                    return $"Données enregistrées.";
                 case "inuktitut":
-                    return $"ᑎᑎᕋᖅᓯᒪᔪᑦ ᖃᐅᔨᓴᖅᑕᐅᓂᑯᐃᑦ ᑐᖅᑯᖅᑕᐅᓯᒪᔪᑦ. | ᐅᕙᙵᑦ: {host}";
+                    return $"ᑎᑎᕋᖅᓯᒪᔪᑦ ᖃᐅᔨᓴᖅᑕᐅᓂᑯᐃᑦ ᑐᖅᑯᖅᑕᐅᓯᒪᔪᑦ.";
                 case "english":
                 default:
-                    return $"Data saved. | From: {host}";
+                    return $"File saved.";
             }
         }
 
@@ -172,12 +172,10 @@ namespace SharpENDEC
             switch (lang)
             {
                 case "french":
-                    return $"{count} chaîne(s) avaient des paires correspondantes et n'ont pas été traités.";
-                case "inuktitut":
-                    return $"{count} ᐊᒃᖢᓇᐅᔭᑦ ᐊᔾᔨᒌᓂᒃ ᐱᖃᑎᒌᓚᐅᖅᐳᑦ, ᐱᓕᕆᐊᖑᓚᐅᙱᖦᖢᑎᒡᓗ.";
+                    return $"{count} alerte(s) avaient des noms correspondants et n'ont pas été téléchargées.";
                 case "english":
                 default:
-                    return $"{count} string(s) had matching pairs, and were not processed.";
+                    return $"{count} alert(s) had matching names, and were not downloaded.";
             }
         }
 
@@ -261,7 +259,7 @@ namespace SharpENDEC
             }
         }
 
-        public static string CapturedFromFileWatcher(string lang)
+        public static string CapturedFromFileWatcher(string lang, DateTime dt)
         {
             switch (lang)
             {
@@ -271,7 +269,7 @@ namespace SharpENDEC
                     return "ᓄᑖᑦ ᓈᓴᐅᑏᑦ/ᑎᑎᖅᑲᐃᑦ ᐱᔭᐅᓚᐅᖅᑐᑦ.";
                 case "english":
                 default:
-                    return "New data was captured.";
+                    return $"Data captured at {dt:T}.";
             }
         }
 
@@ -378,10 +376,10 @@ namespace SharpENDEC
             switch (lang)
             {
                 case "french":
-                    return "Les données ont été ignorées car elles se trouvaient déjà dans la file d’attente ou dans l’historique.";
+                    return "Les données ont été ignorées en raison d'une correspondance file d'attente/historique.";
                 case "english":
                 default:
-                    return "The data was skipped because it's already in either the queue or history.";
+                    return "The data was skipped due to a queue/history match.";
             }
         }
 
